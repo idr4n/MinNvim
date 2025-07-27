@@ -6,7 +6,6 @@ vim.opt.autowrite = true
 vim.opt.backup = false
 vim.opt.breakindent = true
 vim.opt.expandtab = true
-vim.opt.foldcolumn = "1"
 vim.opt.foldmethod = "indent"
 vim.opt.foldlevel = 99
 vim.opt.foldlevelstart = 99
@@ -14,18 +13,30 @@ vim.opt.ignorecase = true
 vim.opt.linebreak = true
 vim.opt.list = true
 vim.opt.scrolloff = 5
-vim.opt.shiftwidth = 4
+vim.opt.shiftwidth = 2
 vim.opt.showbreak = "↪ "
-vim.opt.signcolumn = "yes"
-vim.opt.softtabstop = -1
+vim.opt.signcolumn = "yes:2"
+-- vim.opt.signcolumn = "yes"
+-- vim.opt.softtabstop = -1
 vim.opt.splitbelow = true
 vim.opt.splitright = true
 vim.opt.swapfile = false
+vim.opt.tabstop = 2
 vim.opt.writebackup = false
+
+-- List chars
+vim.opt.listchars = { trail = "·", tab = "  ", nbsp = "␣" }
+vim.opt.fillchars = {
+  foldopen = "",
+  foldclose = "",
+  fold = " ",
+  foldsep = " ",
+  -- eob = " ",
+}
 
 -- Disable treesitter
 -- vim.treesitter.start = function() end
-vim.api.nvim_create_autocmd("BufEnter", {callback = function() vim.treesitter.stop() end})
+-- vim.api.nvim_create_autocmd("BufEnter", {callback = function() vim.treesitter.stop() end})
 
 -- Enable syntax and load colorscheme
 vim.cmd.colorscheme("minimal")
