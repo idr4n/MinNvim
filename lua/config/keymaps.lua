@@ -152,3 +152,12 @@ keymap("n", "ce", '"_ce')
 keymap("n", "ci", '"_ci')
 keymap("n", "C", '"_C')
 keymap("v", "x", '"_x')
+
+-- Git diff commands
+vim.cmd([[
+  command! DiffOrig vert new | set bt=nofile | r ++edit # | 0d_
+        \ | diffthis | wincmd p | diffthis
+]])
+
+keyset("n", "<leader>gd", require("utils").git_diff, { desc = "Diff with git HEAD" })
+keyset("n", "<leader>go", ":DiffOrig<CR>", { desc = "Diff with file on disk" })

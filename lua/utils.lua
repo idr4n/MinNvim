@@ -51,4 +51,34 @@ function M.cursorMoveAround()
   end
 end
 
+-- Git diff function
+function M.git_diff()
+  local current_file = vim.fn.expand("%")
+  if current_file == "" then
+    print("No file name")
+    return
+  end
+
+  -- Create vertical split with git HEAD version
+  vim.cmd("vert new")
+  vim.cmd("set bt=nofile")
+  vim.cmd("r !git show HEAD:" .. vim.fn.shellescape(current_file))
+  vim.cmd("0d_")
+  vim.cmd("diffthis")
+  vim.cmd("wincmd p")
+  vim.cmd("diffthis")
+
+  -- Set local keymap to quit diff mode and close scratch buffer
+  vim.keymap.set("n", "q", function()
+    vim.cmd("diffoff!")
+    local buffers = vim.api.nvim_list_bufs()
+    for _, buf in ipairs(buffers) do
+      if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == "nofile" then
+        vim.api.nvim_buf_delete(buf, { force = true })
+        break
+      end
+    end
+  end, { buffer = true, desc = "Quit diff and close scratch buffer" })
+end
+
 return M
