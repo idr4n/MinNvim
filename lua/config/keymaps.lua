@@ -122,11 +122,11 @@ keyset("n", "<space>c", function()
   vim.cmd("1d")
 end)
 keyset("n", "<leader>ff", ":e **/*")
+keyset("n", "<C-p>", require("utils").fzy_files, { desc = "Find files with fzy" })
 vim.keymap.set({ "n", "i", "v" }, "<C-l>", require("utils").cursorMoveAround, { desc = "Move Around Cursor" })
 keyset({ "n", "t" }, "<A-,>", require("utils").toggle_maximize_buffer, { desc = "Maximize buffer" })
-keyset("n", "<C-Space>", function()
-  vim.api.nvim_feedkeys(":e **/*", "n", false)
-end, { desc = "Switch buffer" })
+keyset("n", "<leader>e", function() vim.api.nvim_feedkeys(":e **/*", "n", false) end, { desc = "Switch buffer" })
+keyset("n", "<leader>gd", require("utils").git_diff, { desc = "Diff with git HEAD" })
 
 -- Add undo break-points
 keymap("i", ",", ",<c-g>u")
@@ -152,12 +152,3 @@ keymap("n", "ce", '"_ce')
 keymap("n", "ci", '"_ci')
 keymap("n", "C", '"_C')
 keymap("v", "x", '"_x')
-
--- Git diff commands
-vim.cmd([[
-  command! DiffOrig vert new | set bt=nofile | r ++edit # | 0d_
-        \ | diffthis | wincmd p | diffthis
-]])
-
-keyset("n", "<leader>gd", require("utils").git_diff, { desc = "Diff with git HEAD" })
-keyset("n", "<leader>go", ":DiffOrig<CR>", { desc = "Diff with file on disk" })
