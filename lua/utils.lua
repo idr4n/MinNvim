@@ -1,0 +1,54 @@
+local M = {}
+
+-- Window maximize toggle
+vim.b.is_zoomed = false
+vim.w.original_window_layout = {}
+
+function M.toggle_maximize_buffer()
+  if not vim.b.is_zoomed then
+    vim.w.original_window_layout = vim.api.nvim_call_function("winrestcmd", {})
+    vim.cmd("wincmd _")
+    vim.cmd("wincmd |")
+    vim.b.is_zoomed = true
+  else
+    vim.api.nvim_call_function("execute", { vim.w.original_window_layout })
+    vim.b.is_zoomed = false
+  end
+end
+
+function M.cursorMoveAround()
+  local win_height = vim.api.nvim_win_get_height(0)
+  local cursor_winline = vim.fn.winline()
+  local middle_line = math.floor(win_height / 2)
+
+  local current_mode = vim.api.nvim_get_mode().mode
+  if cursor_winline <= middle_line + 1 and cursor_winline >= middle_line - 1 then
+    if current_mode == "i" then
+      local current_cursor_pos = vim.api.nvim_win_get_cursor(0)
+      local current_row = current_cursor_pos[1]
+      local current_col = current_cursor_pos[2]
+
+      -- Center the screen without leaving insert mode
+      vim.cmd("keepjumps normal! zt")
+      -- Adjust the cursor position back to the original position
+      vim.api.nvim_win_set_cursor(0, { current_row, current_col })
+    else
+      vim.cmd("normal! zt")
+    end
+  else
+    if current_mode == "i" then
+      local current_cursor_pos = vim.api.nvim_win_get_cursor(0)
+      local current_row = current_cursor_pos[1]
+      local current_col = current_cursor_pos[2]
+
+      -- Center the screen without leaving insert mode
+      vim.cmd("keepjumps normal! zz")
+      -- Adjust the cursor position back to the original position
+      vim.api.nvim_win_set_cursor(0, { current_row, current_col })
+    else
+      vim.cmd("normal! zz")
+    end
+  end
+end
+
+return M
