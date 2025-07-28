@@ -86,6 +86,32 @@ keyset("n", "[q", "<cmd>cprev<cr>zvzz", { desc = "Previous quickfix item" })
 keyset("n", "]q", "<cmd>cnext<cr>zvzz", { desc = "Next quickfix item" })
 keyset("n", "[l", "<cmd>lprev<cr>zvzz", { desc = "Previous loclist item" })
 keyset("n", "]l", "<cmd>lnext<cr>zvzz", { desc = "Next loclist item" })
+vim.keymap.set('n', '<C-p>', function ()
+  local qf_exists = false
+  for _, win in pairs(vim.fn.getwininfo()) do
+    if win["quickfix"] == 1 then
+      qf_exists = true
+      break
+    end
+  end
+  if qf_exists then
+    vim.cmd("cclose")
+  else
+    -- Open with specific height (10 lines)
+    vim.cmd("copen 10")
+  end
+end, { desc = 'Toggle quickfix list' })
+
+-- Moving around windows
+keyset({ "n", "t" }, "<C-t>", function()
+  if vim.b.is_zoomed then
+    vim.b.is_zoomed = false
+    vim.api.nvim_call_function("execute", { vim.w.original_window_layout })
+    vim.cmd("wincmd w")
+  else
+    vim.cmd("wincmd w")
+  end
+end, { desc = "Smart window cycle" })
 
 -- Fold mappings
 keyset("n", "z0", ":set foldlevel=0<cr>", { desc = "Fold level 0" })
@@ -151,21 +177,21 @@ keymap("n", "ci", '"_ci')
 keymap("n", "C", '"_C')
 keymap("v", "x", '"_x')
 
--- Completions
-keyset('i', '<C-Space>', '<C-x><C-o>', { desc = 'Omnicompletion' })
-keyset('i', '<C-f>', '<C-x><C-f>', { desc = 'File Omnicompletion' })
-keyset('i', '<C-b>', '<C-x><C-l>', { desc = 'Line Omnicompletion' })
-keyset('i', '<Tab>', function()
-  if vim.fn.pumvisible() == 1 then
-    return '<C-n>'
-  else
-    return '<Tab>'
-  end
-end, { expr = true, desc = 'Next completion or Tab' })
-keyset('i', '<S-Tab>', function()
-  if vim.fn.pumvisible() == 1 then
-    return '<C-p>'
-  else
-    return '<S-Tab>'
-  end
-end, { expr = true, desc = 'Previous completion or Shift-Tab' })
+-- If using native neovim completions
+-- keyset('i', '<C-Space>', '<C-x><C-o>', { desc = 'Omnicompletion' })
+-- keyset('i', '<C-f>', '<C-x><C-f>', { desc = 'File Omnicompletion' })
+-- keyset('i', '<C-b>', '<C-x><C-l>', { desc = 'Line Omnicompletion' })
+-- keyset('i', '<Tab>', function()
+--   if vim.fn.pumvisible() == 1 then
+--     return '<C-n>'
+--   else
+--     return '<Tab>'
+--   end
+-- end, { expr = true, desc = 'Next completion or Tab' })
+-- keyset('i', '<S-Tab>', function()
+--   if vim.fn.pumvisible() == 1 then
+--     return '<C-p>'
+--   else
+--     return '<S-Tab>'
+--   end
+-- end, { expr = true, desc = 'Previous completion or Shift-Tab' })
