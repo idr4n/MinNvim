@@ -152,3 +152,22 @@ keymap("n", "ce", '"_ce')
 keymap("n", "ci", '"_ci')
 keymap("n", "C", '"_C')
 keymap("v", "x", '"_x')
+
+-- Completions
+keyset('i', '<C-Space>', '<C-x><C-o>', { desc = 'Omnicompletion' })
+keyset('i', '<C-f>', '<C-x><C-f>', { desc = 'File Omnicompletion' })
+keyset('i', '<C-b>', '<C-x><C-l>', { desc = 'Line Omnicompletion' })
+keyset('i', '<Tab>', function()
+  if vim.fn.pumvisible() == 1 then
+    return '<C-n>'
+  else
+    return '<Tab>'
+  end
+end, { expr = true, desc = 'Next completion or Tab' })
+keyset('i', '<S-Tab>', function()
+  if vim.fn.pumvisible() == 1 then
+    return '<C-p>'
+  else
+    return '<S-Tab>'
+  end
+end, { expr = true, desc = 'Previous completion or Shift-Tab' })

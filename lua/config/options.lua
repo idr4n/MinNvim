@@ -5,6 +5,7 @@ vim.o.undofile = true
 vim.opt.autowrite = true
 vim.opt.backup = false
 vim.opt.breakindent = true
+vim.opt.completeopt = { 'menu', 'menuone', 'noselect', 'fuzzy', 'popup' }
 vim.opt.expandtab = true
 vim.opt.foldmethod = "indent"
 vim.opt.foldlevel = 99
