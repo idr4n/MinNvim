@@ -20,9 +20,7 @@ vim.g.maplocalleader = "," -- "\" is the default
 keymap("i", "jk", "<ESC>")
 keymap("i", "<C-a>", "<Home>")
 keymap("i", "<C-e>", "<End>")
-keymap("i", "<C-b>", "<Left>")
 keymap("i", "<A-b>", "<ESC>bi")
-keymap("i", "<C-f>", "<Right>")
 keymap("i", "<A-f>", "<ESC>lwi")
 
 -- General mappings
@@ -116,13 +114,13 @@ end, { desc = "Toggle Line Numbers" })
 -- Utility mappings
 keyset("n", "<space>y", "<cmd>let @+ = expand('%:p')<CR>")
 keyset("n", "<space>c", function()
-  -- vim.cmd("nos vne | setl bt=nofile bh=wipe")
+  local command = vim.fn.input("Command: ", "", "shellcmd")
+  if command == "" then return end
   vim.cmd("nos ene | setl bt=nofile")
-  vim.cmd("r !" .. vim.fn.input(""))
+  vim.cmd("r !" .. command)
   vim.cmd("1d")
+  vim.bo.filetype = "sh"
 end)
-keyset("n", "<leader>ff", ":e **/*")
-keyset("n", "<C-p>", require("utils").fzy_files, { desc = "Find files with fzy" })
 vim.keymap.set({ "n", "i", "v" }, "<C-l>", require("utils").cursorMoveAround, { desc = "Move Around Cursor" })
 keyset({ "n", "t" }, "<A-,>", require("utils").toggle_maximize_buffer, { desc = "Maximize buffer" })
 keyset("n", "<leader>e", function() vim.api.nvim_feedkeys(":e **/*", "n", false) end, { desc = "Switch buffer" })
