@@ -75,10 +75,9 @@ function M.git_diff()
     for _, buf in ipairs(buffers) do
       if vim.api.nvim_buf_is_valid(buf) and vim.bo[buf].buftype == "nofile" then
         vim.api.nvim_buf_delete(buf, { force = true })
-        break
       end
     end
-  end, { buffer = true, desc = "Quit diff and close scratch buffer" })
+  end, { buffer = true, desc = "Quit diff and close scratch buffer(s)" })
 end
 
 return M

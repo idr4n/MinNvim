@@ -26,8 +26,6 @@ keymap("i", "<A-f>", "<ESC>lwi")
 -- General mappings
 keymap("n", "j", "gj")
 keymap("n", "k", "gk")
-keymap("n", "]<space>", "<cmd>call append(line('.'),   repeat([''], v:count1))<cr>", { desc = "Insert line below" })
-keymap("n", "[<space>", "<cmd>call append(line('.')-1, repeat([''], v:count1))<cr>", { desc = "Insert line above" })
 keyset({ "n", "i" }, "<C-S>", "<cmd>w<CR><esc>", { desc = "Save file" })
 keyset("n", "<leader>fs", "<cmd>w<CR>", { desc = "Save file" })
 keymap("n", "<leader>qq", ":qa<CR>", { desc = "Quit all" })
@@ -86,21 +84,29 @@ keyset("n", "[q", "<cmd>cprev<cr>zvzz", { desc = "Previous quickfix item" })
 keyset("n", "]q", "<cmd>cnext<cr>zvzz", { desc = "Next quickfix item" })
 keyset("n", "[l", "<cmd>lprev<cr>zvzz", { desc = "Previous loclist item" })
 keyset("n", "]l", "<cmd>lnext<cr>zvzz", { desc = "Next loclist item" })
-vim.keymap.set('n', '<C-p>', function ()
+vim.keymap.set('n', '<C-q>', function ()
   local qf_exists = false
+  local loc_exists = false
   for _, win in pairs(vim.fn.getwininfo()) do
     if win["quickfix"] == 1 then
       qf_exists = true
-      break
+    elseif win["loclist"] == 1 then
+      loc_exists = true
     end
   end
-  if qf_exists then
+  if qf_exists or loc_exists then
     vim.cmd("cclose")
+    vim.cmd("lclose")
   else
-    -- Open with specific height (10 lines)
-    vim.cmd("copen 10")
+    if vim.fn.getloclist(0, {size = 0}).size > 0 then
+      vim.cmd("lopen 10")
+    elseif vim.fn.getqflist({size = 0}).size > 0 then
+      vim.cmd("copen 10")
+    else
+      vim.cmd("copen 10")
+    end
   end
-end, { desc = 'Toggle quickfix list' })
+end, { desc = 'Toggle quickfix/location list' })
 
 -- Moving around windows
 keyset({ "n", "t" }, "<C-t>", function()
@@ -139,17 +145,30 @@ end, { desc = "Toggle Line Numbers" })
 
 -- Utility mappings
 keyset("n", "<space>y", "<cmd>let @+ = expand('%:p')<CR>")
-keyset("n", "<space>c", function()
-  local command = vim.fn.input("Command: ", "", "shellcmd")
+keyset("n", "<space>cs", function()
+  local command = vim.fn.input("Shell Command: ")
   if command == "" then return end
   vim.cmd("nos ene | setl bt=nofile")
   vim.cmd("r !" .. command)
   vim.cmd("1d")
   vim.bo.filetype = "sh"
-end)
-vim.keymap.set({ "n", "i", "v" }, "<C-l>", require("utils").cursorMoveAround, { desc = "Move Around Cursor" })
+end, { desc = "Shell Command to Scratch" })
+keyset("n", "<space>cv", function()
+  local command = vim.fn.input("Vim Command: ", "", "command")
+  if command == "" then return end
+  vim.cmd("nos ene | setl bt=nofile")
+  local output = vim.fn.execute(command)
+  local lines = vim.split(output, '\n', { plain = true })
+  vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
+  if command:match("^hi") or command:match("^highlight") or command:match("^map") then
+    vim.bo.filetype = "vim"
+  else
+    vim.bo.filetype = "text"
+  end
+end, { desc = "Vim Command to Scratch" })
+keyset({ "n", "i", "v" }, "<C-l>", require("utils").cursorMoveAround, { desc = "Move Around Cursor" })
 keyset({ "n", "t" }, "<A-,>", require("utils").toggle_maximize_buffer, { desc = "Maximize buffer" })
-keyset("n", "<leader>e", function() vim.api.nvim_feedkeys(":e **/*", "n", false) end, { desc = "Switch buffer" })
+keyset("n", "<leader>e", function() vim.api.nvim_feedkeys(":find **/*", "n", false) end, { desc = "Switch buffer" })
 keyset("n", "<leader>gd", require("utils").git_diff, { desc = "Diff with git HEAD" })
 
 -- Add undo break-points
