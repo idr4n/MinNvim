@@ -32,8 +32,9 @@ end
 --: }}}
 
 --: On attach autocmd {{{
+local group = vim.api.nvim_create_augroup("idr4n/LspConfig", { clear = true })
 vim.api.nvim_create_autocmd("LspAttach", {
-  group = vim.api.nvim_create_augroup("idr4n/LspConfig", { clear = true }),
+  group = group,
   desc = "Configure LSP keymaps",
   --stylua: ignore
   callback = function(args)
@@ -41,6 +42,9 @@ vim.api.nvim_create_autocmd("LspAttach", {
     vim.keymap.set("n", "gd", vim.lsp.buf.definition, { buffer = args.buf, desc = "Go to definition" })
     vim.keymap.set("n", '[e', function() vim.diagnostic.jump { count = -1, severity = vim.diagnostic.severity.ERROR } end, { buffer = args.buf, desc = "Previous Error" })
     vim.keymap.set("n", ']e', function() vim.diagnostic.jump { count = -1, severity = vim.diagnostic.severity.ERROR } end, { buffer = args.buf, desc = "Next Error" })
+    vim.keymap.set("n", "<leader>th", function()
+      vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = args.buf }), { bufnr = args.buf })
+    end, { buffer = args.buf, desc = "Toggle inlay hints" })
   end,
 })
 --: }}}
