@@ -144,6 +144,9 @@ require('blink.cmp').setup {
 
   sources = {
     default = { "lsp", "path", "buffer", "snippets", },
+    providers = {
+      lsp = { opts = { tailwind_color_icon = '󱓻' }, }
+    }
   },
 
   completion = {
@@ -153,18 +156,6 @@ require('blink.cmp').setup {
       auto_show = false,
       draw = {
         gap =  2,
-        -- no icons: remove { "kind_icon", "kind" } from column list, like this:
-        -- columns = { { "label", "label_description", gap = 1 } },
-        components = {
-          kind_icon = {
-            text = function(ctx)
-              if require("blink.cmp.sources.lsp.hacks.tailwind").get_hex_color(ctx.item) then
-                return "󱓻"
-              end
-              return ctx.kind_icon .. ctx.icon_gap
-            end,
-          },
-        },
       },
     },
     documentation = {
