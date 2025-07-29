@@ -2,6 +2,7 @@
 
 --: Enabled LSP's {{{
 vim.lsp.enable({
+  "gopls",
   "lua_ls",
   "pyright",
   "ruff",
