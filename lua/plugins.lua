@@ -5,10 +5,10 @@ local p = manager.add
 
 --: Lazy load treesitter {{{
 p({
-  src = 'https://github.com/nvim-treesitter/nvim-treesitter',
+  src = 'nvim-treesitter/nvim-treesitter',
   event = { 'BufReadPost', 'BufNewFile', 'BufWritePre' },
   config = function()
-    vim.pack.add({ 'https://github.com/nvim-treesitter/nvim-treesitter' })
+    vim.pack.add({ 'nvim-treesitter/nvim-treesitter' })
     require('nvim-treesitter.configs').setup({
       ensure_installed = { 'lua', 'vim', 'vimdoc', 'query', 'go', 'markdown', 'markdown_inline' },
       highlight = { enable = true, additional_vim_regex_highlighting = false },
@@ -20,10 +20,9 @@ p({
 
 --: Lazy load mini.diff {{{
 p({
-  src = 'https://github.com/echasnovski/mini.diff',
+  src = 'echasnovski/mini.diff',
   event = { 'BufReadPost', 'BufNewFile', 'BufWritePre' },
   config = function()
-    vim.pack.add({ 'https://github.com/echasnovski/mini.diff' })
     local minidiff = require('mini.diff')
     minidiff.setup({
       view = { signs = { add = ' +', change = ' ~', delete = ' -' } },
@@ -45,10 +44,9 @@ p({
 
 --: Lazy load mini.surround {{{
 p({
-  src = 'https://github.com/echasnovski/mini.surround',
+  src = 'echasnovski/mini.surround',
   event = { 'BufReadPost', 'BufNewFile', 'BufWritePre' },
   config = function()
-    vim.pack.add({ 'https://github.com/echasnovski/mini.surround' })
     require('mini.surround').setup({
       mappings = {
         add = 'S',
@@ -66,10 +64,9 @@ p({
 
 --: Lazy load nvim-autopairs {{{
 p({
-  src = 'https://github.com/windwp/nvim-autopairs',
+  src = 'windwp/nvim-autopairs',
   event = { 'BufReadPost', 'BufNewFile' },
   config = function()
-    vim.pack.add({ 'https://github.com/windwp/nvim-autopairs' })
     local npairs = require('nvim-autopairs')
     local Rule = require('nvim-autopairs.rule')
     local cond = require('nvim-autopairs.conds')
@@ -113,7 +110,7 @@ p({
 
 --: Lazy load fzf-lua {{{
 p({
-  src = 'https://github.com/ibhagwan/fzf-lua',
+  src = 'ibhagwan/fzf-lua',
   config = function()
     require('fzf-lua').setup({
       winopts = {
@@ -153,10 +150,9 @@ p({
 
 --: Lazy load nvim-highlight-colors {{{
 p({
-  src = 'https://github.com/brenoprata10/nvim-highlight-colors',
+  src = 'brenoprata10/nvim-highlight-colors',
   ft = { 'cfg', 'css', 'html', 'conf', 'lua', 'scss', 'toml', 'markdown', 'typescript', 'typescriptreact' },
   config = function()
-    vim.pack.add({ 'https://github.com/brenoprata10/nvim-highlight-colors' })
     require('nvim-highlight-colors').setup({
       render = 'virtual',
       virtual_symbol = '󱓻',
@@ -170,7 +166,7 @@ p({
 
 --: Lazy load netrw-preview {{{
 p({
-  src = 'https://github.com/idr4n/netrw-preview.nvim',
+  src = 'idr4n/netrw-preview.nvim',
   config = function()
     require('netrw-preview').setup({
       preview_width = 65,
@@ -194,7 +190,7 @@ p({
 
 --: Lazy load blink-cmp {{{
 p({
-  src = 'https://github.com/saghen/blink.cmp',
+  src = 'saghen/blink.cmp',
   event = 'InsertEnter',
   version = 'v1.6.0',
   config = function()

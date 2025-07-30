@@ -6,7 +6,7 @@ M.loaded_plugins = {}
 -- Plugin specification
 function M.add(spec)
   -- spec = {
-  --   src = "https://github.com/user/plugin", -- git URL
+  --   src = "user/plugin" or "https://github.com/user/plugin", -- GitHub shortcut or full URL
   --   name = "plugin", -- optional, derived from src if not provided
   --   enabled = true, -- default true, set false to disable
   --   version = "v1.2.3", -- git tag, branch, or commit hash
@@ -18,6 +18,17 @@ function M.add(spec)
   --   config = function() end, -- setup function (runs only once)
   --   lazy = true -- default true
   -- }
+
+  -- Parse and normalize src URL
+  local src = spec.src
+  if not src:match('^https?://') and not src:match('^git@') then
+    -- GitHub shortcut format: "user/repo" -> "https://github.com/user/repo"
+    src = 'https://github.com/' .. src
+    if not src:match('%.git$') then
+      src = src .. '.git'
+    end
+  end
+  spec.src = src
 
   local name = spec.name or spec.src:match('([^/]+)$'):gsub('%.git$', '')
   spec.name = name
