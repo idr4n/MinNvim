@@ -151,6 +151,53 @@ function M.lazyload_on_filetypes(spec, group)
   })
 end
 
+-- Execute build command
+function M.run_build(spec)
+  if not spec.build then return true end
+
+  print('Building ' .. spec.name .. '...')
+
+  -- Get plugin path from vim.pack
+  local pack_list = vim.pack.list()
+  local plugin_info = nil
+  for _, info in ipairs(pack_list) do
+    if info.spec.name == spec.name then
+      plugin_info = info
+      break
+    end
+  end
+
+  if not plugin_info then
+    print('Could not find plugin path for ' .. spec.name)
+    return false
+  end
+
+  local plugin_path = plugin_info.path
+
+  if type(spec.build) == 'function' then
+    -- Execute Lua function
+    local success, err = pcall(spec.build, plugin_path)
+    if not success then
+      print('Build failed for ' .. spec.name .. ': ' .. err)
+      return false
+    end
+  elseif type(spec.build) == 'string' then
+    -- Execute shell command in plugin directory
+    local cmd = string.format("cd '%s' && %s", plugin_path, spec.build)
+    local result = vim.fn.system(cmd)
+    local exit_code = vim.v.shell_error
+
+    if exit_code ~= 0 then
+      print('Build failed for ' .. spec.name .. ':')
+      print(result)
+      return false
+    end
+  end
+
+  print('Build completed for ' .. spec.name)
+  return true
+end
+
 -- Get enabled plugin names
 function M.get_enabled_plugin_names()
   local enabled = {}
