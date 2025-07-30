@@ -1,3 +1,4 @@
+---@class PackageManager
 local M = {}
 
 M.plugins = {}
