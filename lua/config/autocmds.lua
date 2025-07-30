@@ -4,6 +4,26 @@ local function augroup(name)
   return vim.api.nvim_create_augroup("idr4n/" .. name, { clear = true })
 end
 
+-- Custom message without loading time
+local startup_group = augroup("StartUpScreen")
+vim.api.nvim_create_autocmd("VimEnter", {
+  group = startup_group,
+  desc = "Show minimal startup screen",
+  callback = function()
+    -- require('utils').show_startup_screen("", false)
+    require('utils').show_startup_screen("Neovim")
+    -- require('utils').show_startup_screen("Neovim", false)
+  end,
+})
+
+-- Restore normal settings when opening actual files
+aucmd({"BufRead", "BufNewFile"}, {
+  group = startup_group,
+  callback = function()
+    require('utils').restore_ui_settings()
+  end,
+})
+
 -- close some filetypes with <q>
 aucmd("FileType", {
   group = augroup("close_with_q"),
