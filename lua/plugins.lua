@@ -245,3 +245,57 @@ p({
   end,
 })
 --: }}}
+
+--: zk-nvim {{{
+p({
+  src = 'zk-org/zk-nvim',
+  dependencies = { 'ibhagwan/fzf-lua' },
+  ft = 'markdown',
+  cmd = { 'ZkNotes', 'ZkTags', 'ZkBacklinks' },
+  keys = {
+    { 'n', '<leader>nf', "<cmd>ZkNotes { sort = { 'modified' } }<cr>", { silent = true, desc = 'ZK Find Notes' } },
+    {
+      'n',
+      '<leader>nn',
+      "<Cmd>ZkNew { title = vim.fn.input('Title: ') }<CR>",
+      { silent = true, desc = 'ZK New Note' },
+    },
+    { 'n', '<leader>nd', "<cmd>ZkNew { dir = 'journal/daily' }<cr>", { silent = true, desc = 'ZK Daily Note' } },
+    { 'n', '<leader>nw', "<Cmd>ZkNew { dir = 'journal/weekly' }<CR>", { silent = true, desc = 'ZK Weekly Note' } },
+    { 'n', '<leader>nt', '<Cmd>ZkTag<CR>', { silent = true, desc = 'ZK Tags' } },
+    { 'n', '<leader>nb', '<Cmd>ZkBacklinks<CR>', { silent = true, desc = 'ZK Backlinks' } },
+    {
+      'n',
+      '<leader>nss',
+      "<Cmd>ZkNotes { sort = { 'modified' }, match = { vim.fn.input('Search: ') } }<CR>",
+      { silent = true, desc = 'ZK Search query' },
+    },
+    { 'n', '<leader>nsd', '<Cmd>ZkNotesDaily<CR>', { silent = true, desc = 'ZK Search Daily Notes' } },
+    { 'n', '<leader>nsw', '<Cmd>ZkNotesWeekly<CR>', { silent = true, desc = 'ZK Search Weekly Notes' } },
+  },
+  config = function()
+    local zk = require('zk')
+    local commands = require('zk.commands')
+
+    local function make_edit_fn(defaults, picker_options)
+      return function(options)
+        options = vim.tbl_extend('force', defaults, options or {})
+        zk.edit(options, picker_options)
+      end
+    end
+
+    commands.add(
+      'ZkNotesDaily',
+      make_edit_fn({ hrefs = { 'journal/daily' }, sort = { 'modified' } }, { title = 'Zk Daily Notes' })
+    )
+    commands.add(
+      'ZkNotesWeekly',
+      make_edit_fn({ hrefs = { 'journal/weekly' }, sort = { 'modified' } }, { title = 'Zk Weekly Notes' })
+    )
+
+    require('zk').setup({
+      picker = 'fzf_lua',
+    })
+  end,
+})
+--: }}}
