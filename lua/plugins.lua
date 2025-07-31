@@ -193,7 +193,8 @@ p({
 p({
   src = 'saghen/blink.cmp',
   event = 'InsertEnter',
-  version = 'v1.6.0',
+  -- version = 'v1.6.0',
+  build = "cargo build --release",
   config = function()
     require('blink.cmp').setup({
       cmdline = {
