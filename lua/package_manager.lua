@@ -409,4 +409,21 @@ function M.status()
   end
 end
 
+-- Create user commands for package management
+vim.api.nvim_create_user_command('PackStatus', function() M.status() end, { desc = 'Show plugin status' })
+
+vim.api.nvim_create_user_command('PackInstall', function() M.install() end, { desc = 'Install missing plugins' })
+
+vim.api.nvim_create_user_command('PackUpdate', function(opts)
+  local force = opts.bang
+  M.update({ force = force })
+end, { desc = 'Update plugins (use ! to force)', bang = true })
+
+vim.api.nvim_create_user_command('PackClean', function() M.clean() end, { desc = 'Remove disabled plugins' })
+
+vim.api.nvim_create_user_command('PackSync', function(opts)
+  local force = opts.bang
+  M.sync({ force = force })
+end, { desc = 'Sync plugins: install, update, clean (use ! to force)', bang = true })
+
 return M
