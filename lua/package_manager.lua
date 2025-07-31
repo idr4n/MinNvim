@@ -4,23 +4,22 @@ local M = {}
 M.plugins = {}
 M.loaded_plugins = {}
 
--- Plugin specification
-function M.add(spec)
-  -- spec = {
-  --   src = "user/plugin" or "https://github.com/user/plugin", -- GitHub shortcut or full URL
-  --   name = "plugin", -- optional, derived from src if not provided
-  --   enabled = true, -- default true, set false to disable
-  --   version = "v1.2.3", -- git tag, branch, or commit hash
-  --   build = "make", -- string command or function
-  --   event = "InsertEnter", -- or table of events
-  --   ft = "lua", -- or table of filetypes
-  --   keys = "<leader>ff", -- string, array of strings, or LazyVim format
-  --   cmd = "CommandName", -- or table of commands
-  --   config = function() end, -- setup function (runs only once)
-  --   dependencies = { "user/dep-plugin" }, -- string or table of dependency plugin sources
-  --   lazy = true -- default true
-  -- }
+---@class PluginSpec
+---@field src string GitHub shortcut (user/plugin) or full URL
+---@field name? string Plugin name (derived from src if not provided)
+---@field enabled? boolean Default true, set false to disable
+---@field version? string Git tag, branch, or commit hash
+---@field build? string|function String command or function to run after install/update
+---@field event? string|string[] Event name or table of events for lazy loading
+---@field ft? string|string[] Filetype or table of filetypes for lazy loading
+---@field keys? string|string[]|table Key mapping(s) for lazy loading (string, array, or LazyVim format)
+---@field cmd? string|string[] Command name or table of commands for lazy loading
+---@field config? function Setup function (runs only once after loading)
+---@field dependencies? string|string[] Dependency plugin source(s)
+---@field lazy? boolean Default true, set false to load immediately
 
+---@param spec PluginSpec
+function M.add(spec)
   spec = M.create_spec(spec)
   M.plugins[spec.name] = spec
 
