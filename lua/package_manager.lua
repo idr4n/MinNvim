@@ -17,25 +17,12 @@ function M.add(spec)
   --   keys = "<leader>ff", -- string, array of strings, or LazyVim format
   --   cmd = "CommandName", -- or table of commands
   --   config = function() end, -- setup function (runs only once)
+  --   dependencies = { "user/dep-plugin" }, -- string or table of dependency plugin sources
   --   lazy = true -- default true
   -- }
 
-  -- Parse and normalize src URL
-  local src = spec.src
-  if not src:match('^https?://') and not src:match('^git@') then
-    -- GitHub shortcut format: "user/repo" -> "https://github.com/user/repo"
-    src = 'https://github.com/' .. src
-    if not src:match('%.git$') then
-      src = src .. '.git'
-    end
-  end
-  spec.src = src
-
-  local name = spec.name or spec.src:match('([^/]+)$'):gsub('%.git$', '')
-  spec.name = name
-  spec.enabled = spec.enabled ~= false -- default to true if not specified
-
-  M.plugins[name] = spec
+  spec = M.create_spec(spec)
+  M.plugins[spec.name] = spec
 
   -- Only setup if enabled
   if not spec.enabled then return end
@@ -50,10 +37,82 @@ function M.add(spec)
   M.setup_lazy_loading(spec)
 end
 
+-- Normalize src URL (convert GitHub shortcut to full URL)
+function M.normalize_src_url(src)
+  if not src:match('^https?://') and not src:match('^git@') then
+    -- GitHub shortcut format: "user/repo" -> "https://github.com/user/repo"
+    src = 'https://github.com/' .. src
+    if not src:match('%.git$') then
+      src = src .. '.git'
+    end
+  end
+  return src
+end
+
+-- Create/normalize a plugin spec with defaults
+function M.create_spec(input_spec, defaults)
+  defaults = defaults or {}
+
+  local spec = vim.tbl_deep_extend('force', {
+    enabled = true,
+    lazy = true,
+  }, defaults, input_spec)
+
+  -- Normalize src URL
+  spec.src = M.normalize_src_url(spec.src)
+
+  -- Auto-generate name if not provided
+  if not spec.name then
+    spec.name = spec.src:match('([^/]+)$'):gsub('%.git$', '')
+  end
+
+  return spec
+end
+
+-- Resolve dependency by name or src
+function M.resolve_dependency(dep_spec)
+  -- dep_spec can be:
+  -- "plugin-name" -> find by name
+  -- "user/repo" -> find by GitHub shortcut or name  
+  -- "https://github.com/user/repo" -> find by full URL
+
+  -- Create spec to get normalized name
+  local dep_plugin = M.create_spec({ src = dep_spec }, { lazy = false })
+
+  -- Check if plugin with that name already exists
+  if M.plugins[dep_plugin.name] then
+    return M.plugins[dep_plugin.name]
+  end
+
+  -- If not found, add the created spec to plugins
+  print('Creating missing dependency: ' .. dep_spec)
+  M.plugins[dep_plugin.name] = dep_plugin
+  return dep_plugin
+end
+
+-- Load dependencies for a plugin
+function M.load_dependencies(dependencies)
+  local deps = type(dependencies) == 'table' and dependencies or { dependencies }
+
+  for _, dep_spec in ipairs(deps) do
+    local dep_plugin = M.resolve_dependency(dep_spec)
+    if dep_plugin then
+      if not M.loaded_plugins[dep_plugin.name] then
+        M.load_plugin(dep_plugin)
+      end
+    end
+  end
+end
+
 function M.load_plugin(spec)
   -- Only load and configure once
   if M.loaded_plugins[spec.name] then
     return -- Already loaded
+  end
+
+  -- Load dependencies first
+  if spec.dependencies then
+    M.load_dependencies(spec.dependencies)
   end
 
   local pack_spec = {
@@ -97,6 +156,11 @@ function M.setup_lazy_loading(spec)
       end, {
         nargs = '*',
         desc = '[Lazy] ' .. spec.name,
+        complete = function(arg_lead, cmd_line, cursor_pos)
+          if not M.loaded_plugins[spec.name] then
+            M.load_plugin(spec)
+          end
+        end,
       })
     end
   end
