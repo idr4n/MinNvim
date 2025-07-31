@@ -291,7 +291,7 @@ function M.install()
   end
 
   if #enabled_specs > 0 then
-    vim.pack.add({ enabled_specs })
+    vim.pack.add(enabled_specs)
 
     -- Run build commands after installation
     for _, spec in pairs(M.plugins) do
