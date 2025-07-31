@@ -51,3 +51,6 @@ vim.g.netrw_fastbrowse = 0
 vim.g.netrw_bufsettings = "noma nomod nu nowrap ro nobl"
 vim.g.netrw_preview = 1
 vim.g.netrw_alto = 0
+
+-- Statusline
+vim.o.statusline = '%!v:lua.require("config.statusline").StatusLine()'

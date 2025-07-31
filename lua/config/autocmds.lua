@@ -53,3 +53,11 @@ aucmd("BufReadPost", {
   end,
 })
 
+-- Redraw statusline on DiagnosticChanged
+aucmd("DiagnosticChanged", {
+  group = augroup("Status_Diagnostics"),
+  callback = vim.schedule_wrap(function()
+    vim.cmd("redrawstatus")
+  end),
+})
+
