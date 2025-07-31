@@ -105,12 +105,28 @@ function M.load_plugin(spec)
   -- Load dependencies first
   if spec.dependencies then M.load_dependencies(spec.dependencies) end
 
+  -- Check if plugin is already installed before adding
+  local pack_list = vim.pack.get()
+  local already_installed = false
+  for _, info in ipairs(pack_list) do
+    if info.spec.name == spec.name then
+      already_installed = true
+      break
+    end
+  end
+
   local pack_spec = {
     src = spec.src,
     name = spec.name,
     version = spec.version,
   }
   vim.pack.add({ pack_spec })
+
+  -- If plugin was just installed and has build command, run it
+  if not already_installed and spec.build then
+    print('Running build for newly installed plugin: ' .. spec.name)
+    M.run_build(spec)
+  end
 
   -- Mark as loaded first to prevent recursion
   M.loaded_plugins[spec.name] = true
@@ -279,10 +295,17 @@ end
 function M.install()
   print('Installing plugins...')
 
-  local enabled_specs = {}
+  -- Check which plugins are already installed
+  local pack_list = vim.pack.get()
+  local installed_map = {}
+  for _, info in ipairs(pack_list) do
+    installed_map[info.spec.name] = true
+  end
+
+  local to_install = {}
   for _, spec in pairs(M.plugins) do
-    if spec.enabled then
-      table.insert(enabled_specs, {
+    if spec.enabled and not installed_map[spec.name] then
+      table.insert(to_install, {
         src = spec.src,
         name = spec.name,
         version = spec.version,
@@ -290,13 +313,18 @@ function M.install()
     end
   end
 
-  if #enabled_specs > 0 then
-    vim.pack.add(enabled_specs)
+  if #to_install > 0 then
+    vim.pack.add(to_install)
 
-    -- Run build commands after installation
+    -- Run build commands for newly installed plugins
     for _, spec in pairs(M.plugins) do
-      if spec.enabled and spec.build then M.run_build(spec) end
+      if spec.enabled and not installed_map[spec.name] and spec.build then
+        print('Running build for installed plugin: ' .. spec.name)
+        M.run_build(spec)
+      end
     end
+  else
+    print('All enabled plugins are already installed')
   end
 
   print('Installation completed!')
