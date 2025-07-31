@@ -86,14 +86,17 @@ function M.setup_lazy_loading(spec)
   if spec.cmd then
     local commands = type(spec.cmd) == 'table' and spec.cmd or { spec.cmd }
     for _, cmd in ipairs(commands) do
-      vim.api.nvim_create_autocmd('CmdUndefined', {
-        group = group,
-        pattern = cmd,
-        callback = function()
-          M.load_plugin(spec)
-          vim.api.nvim_exec_autocmds('CmdUndefined', { pattern = cmd })
-        end,
-        once = true,
+      vim.api.nvim_create_user_command(cmd, function(opts)
+        vim.api.nvim_del_user_command(cmd)
+        M.load_plugin(spec)
+        local full_cmd = cmd
+        if opts.args and #opts.args > 0 then
+          full_cmd = full_cmd .. ' ' .. opts.args
+        end
+        vim.cmd(full_cmd)
+      end, {
+        nargs = '*',
+        desc = '[Lazy] ' .. spec.name,
       })
     end
   end
