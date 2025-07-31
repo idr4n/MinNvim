@@ -123,8 +123,8 @@ function M.lazyload_on_keys(spec)
         M.load_plugin(spec)
         if type(rhs) == 'string' then
           -- Parse string commands
-          if rhs:match('^<cmd>.*<cr>$') then
-            local cmd = rhs:match('^<cmd>(.+)<cr>$')
+          if rhs:lower():match('^<cmd>.*<cr>$') then
+            local cmd = rhs:match('^<[Cc][Mm][Dd]>(.+)<[Cc][Rr]>$')
             vim.cmd(cmd)
           elseif rhs:match('^:.*<cr>?$') then
             local cmd = rhs:match('^:(.+)<cr>?$')
