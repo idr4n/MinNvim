@@ -53,6 +53,15 @@ aucmd("BufReadPost", {
   end,
 })
 
+-- Lazy load statusline
+aucmd({ 'BufReadPost', 'BufNewFile' }, {
+  group = augroup('LazyLoadStatusline'),
+  once = true,
+  callback = function()
+    vim.opt.statusline = '%!v:lua.require("config.statusline").StatusLine()'
+  end,
+})
+
 -- Redraw statusline on DiagnosticChanged
 aucmd("DiagnosticChanged", {
   group = augroup("Status_Diagnostics"),
@@ -61,3 +70,11 @@ aucmd("DiagnosticChanged", {
   end),
 })
 
+-- Lazy load commands
+aucmd({ 'BufReadPost', 'BufNewFile' }, {
+  group = augroup('LazyLoadCommands'),
+  once = true,
+  callback = function()
+    require('config.commands')
+  end,
+})
