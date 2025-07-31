@@ -226,7 +226,7 @@ function M.run_build(spec)
   print('Building ' .. spec.name .. '...')
 
   -- Get plugin path from vim.pack
-  local pack_list = vim.pack.list()
+  local pack_list = vim.pack.get()
   local plugin_info = nil
   for _, info in ipairs(pack_list) do
     if info.spec.name == spec.name then
@@ -330,7 +330,7 @@ end
 
 -- Remove disabled plugins using vim.pack.del()
 function M.clean()
-  local pack_list = vim.pack.list()
+  local pack_list = vim.pack.get()
   local to_delete = {}
 
   for _, info in ipairs(pack_list) do
@@ -368,9 +368,9 @@ function M.sync(opts)
   print('Sync completed!')
 end
 
--- Get plugin info using vim.pack.list()
+-- Get plugin info using vim.pack.get()
 function M.status()
-  local pack_list = vim.pack.list()
+  local pack_list = vim.pack.get()
   local installed_map = {}
 
   for _, info in ipairs(pack_list) do
