@@ -42,9 +42,7 @@ function M.normalize_src_url(src)
   if not src:match('^https?://') and not src:match('^git@') then
     -- GitHub shortcut format: "user/repo" -> "https://github.com/user/repo"
     src = 'https://github.com/' .. src
-    if not src:match('%.git$') then
-      src = src .. '.git'
-    end
+    if not src:match('%.git$') then src = src .. '.git' end
   end
   return src
 end
@@ -62,9 +60,7 @@ function M.create_spec(input_spec, defaults)
   spec.src = M.normalize_src_url(spec.src)
 
   -- Auto-generate name if not provided
-  if not spec.name then
-    spec.name = spec.src:match('([^/]+)$'):gsub('%.git$', '')
-  end
+  if not spec.name then spec.name = spec.src:match('([^/]+)$'):gsub('%.git$', '') end
 
   return spec
 end
@@ -73,16 +69,14 @@ end
 function M.resolve_dependency(dep_spec)
   -- dep_spec can be:
   -- "plugin-name" -> find by name
-  -- "user/repo" -> find by GitHub shortcut or name  
+  -- "user/repo" -> find by GitHub shortcut or name
   -- "https://github.com/user/repo" -> find by full URL
 
   -- Create spec to get normalized name
   local dep_plugin = M.create_spec({ src = dep_spec }, { lazy = false })
 
   -- Check if plugin with that name already exists
-  if M.plugins[dep_plugin.name] then
-    return M.plugins[dep_plugin.name]
-  end
+  if M.plugins[dep_plugin.name] then return M.plugins[dep_plugin.name] end
 
   -- If not found, add the created spec to plugins
   print('Creating missing dependency: ' .. dep_spec)
@@ -97,9 +91,7 @@ function M.load_dependencies(dependencies)
   for _, dep_spec in ipairs(deps) do
     local dep_plugin = M.resolve_dependency(dep_spec)
     if dep_plugin then
-      if not M.loaded_plugins[dep_plugin.name] then
-        M.load_plugin(dep_plugin)
-      end
+      if not M.loaded_plugins[dep_plugin.name] then M.load_plugin(dep_plugin) end
     end
   end
 end
@@ -111,9 +103,7 @@ function M.load_plugin(spec)
   end
 
   -- Load dependencies first
-  if spec.dependencies then
-    M.load_dependencies(spec.dependencies)
-  end
+  if spec.dependencies then M.load_dependencies(spec.dependencies) end
 
   local pack_spec = {
     src = spec.src,
@@ -142,28 +132,7 @@ function M.setup_lazy_loading(spec)
   if spec.keys then M.lazyload_on_keys(spec) end
 
   -- Command-based lazy loading
-  if spec.cmd then
-    local commands = type(spec.cmd) == 'table' and spec.cmd or { spec.cmd }
-    for _, cmd in ipairs(commands) do
-      vim.api.nvim_create_user_command(cmd, function(opts)
-        vim.api.nvim_del_user_command(cmd)
-        M.load_plugin(spec)
-        local full_cmd = cmd
-        if opts.args and #opts.args > 0 then
-          full_cmd = full_cmd .. ' ' .. opts.args
-        end
-        vim.cmd(full_cmd)
-      end, {
-        nargs = '*',
-        desc = '[Lazy] ' .. spec.name,
-        complete = function(arg_lead, cmd_line, cursor_pos)
-          if not M.loaded_plugins[spec.name] then
-            M.load_plugin(spec)
-          end
-        end,
-      })
-    end
-  end
+  if spec.cmd then M.lazyload_on_commands(spec) end
 end
 
 -- Lazy load on keymaps
@@ -228,6 +197,26 @@ function M.lazyload_on_filetypes(spec, group)
     callback = function() M.load_plugin(spec) end,
     once = true,
   })
+end
+
+-- Lazy load on commands
+function M.lazyload_on_commands(spec)
+  local commands = type(spec.cmd) == 'table' and spec.cmd or { spec.cmd }
+  for _, cmd in ipairs(commands) do
+    vim.api.nvim_create_user_command(cmd, function(opts)
+      vim.api.nvim_del_user_command(cmd)
+      M.load_plugin(spec)
+      local full_cmd = cmd
+      if opts.args and #opts.args > 0 then full_cmd = full_cmd .. ' ' .. opts.args end
+      vim.cmd(full_cmd)
+    end, {
+      nargs = '*',
+      desc = '[Lazy] ' .. spec.name,
+      complete = function()
+        if not M.loaded_plugins[spec.name] then M.load_plugin(spec) end
+      end,
+    })
+  end
 end
 
 -- Execute build command
