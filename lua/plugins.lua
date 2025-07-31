@@ -111,6 +111,7 @@ p({
 --: Lazy load fzf-lua {{{
 p({
   src = 'ibhagwan/fzf-lua',
+  cmd = 'FzfLua',
   config = function()
     require('fzf-lua').setup({
       winopts = {

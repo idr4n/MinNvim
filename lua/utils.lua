@@ -218,8 +218,8 @@ function M.restore_ui_settings()
   if current_buf ~= vim.g.startup_buffer_id then
     -- Restore preferred settings
     vim.wo.signcolumn = 'yes:2'
-    -- vim.o.laststatus = 2 -- Show statusline always
-    -- vim.o.ruler = true -- Restore ruler
+    vim.o.laststatus = 2 -- Show statusline always
+    vim.o.ruler = true -- Restore ruler
   end
 end
 
