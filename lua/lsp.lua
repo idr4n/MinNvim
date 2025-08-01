@@ -38,6 +38,9 @@ vim.api.nvim_create_autocmd("LspAttach", {
   desc = "Configure LSP keymaps",
   --stylua: ignore
   callback = function(args)
+    -- Disable semantic_tokens
+    vim.lsp.semantic_tokens.enable(false)
+
     vim.keymap.set({ "n", "v" }, "<leader>ff", vim.lsp.buf.format, { buffer = args.buf, desc = "Format buffer" })
     vim.keymap.set("n", "gd", vim.lsp.buf.definition, { buffer = args.buf, desc = "Go to definition" })
     vim.keymap.set("n", '[e', function() vim.diagnostic.jump { count = -1, severity = vim.diagnostic.severity.ERROR } end, { buffer = args.buf, desc = "Previous Error" })
