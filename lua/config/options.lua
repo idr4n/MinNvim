@@ -11,12 +11,16 @@ vim.opt.foldmethod = "indent"
 vim.opt.foldlevel = 99
 vim.opt.foldlevelstart = 99
 vim.opt.ignorecase = true
+vim.opt.iskeyword:append('-')
+vim.opt.path:append('**')
 vim.opt.linebreak = true
 vim.opt.list = true
 vim.opt.scrolloff = 5
 vim.opt.shiftwidth = 2
 vim.opt.showbreak = "↪ "
 vim.opt.signcolumn = "yes:2"
+vim.opt.smartcase = true
+vim.opt.smartindent = true
 vim.opt.splitbelow = true
 vim.opt.splitright = true
 vim.opt.swapfile = false
