@@ -51,18 +51,32 @@ function M.pick_definition()
     local filepath = vim.uri_to_fname(uri)
     local formatted_path = format_path_for_title(filepath)
 
+    -- Calculate z-index for proper stacking of nested popups
+    local base_zindex = 1000
+    local current_zindex = base_zindex
+
+    -- Check for existing popup windows and increment z-index
+    for _, win_id in ipairs(vim.api.nvim_list_wins()) do
+      if vim.api.nvim_win_is_valid(win_id) then
+        local win_config = vim.api.nvim_win_get_config(win_id)
+        if win_config.relative ~= '' and win_config.zindex and win_config.zindex >= current_zindex then
+          current_zindex = win_config.zindex + 10
+        end
+      end
+    end
+
     -- Popup window (10 lines, positioned near cursor)
     local opts = {
       style = 'minimal',
       relative = 'cursor',
       width = 80,
-      height = 10,
+      height = 15,
       row = 1,
       col = 0,
       border = 'rounded',
       title = ' Definition @' .. formatted_path .. ' ',
       title_pos = 'center',
-      zindex = 1000,
+      zindex = current_zindex,
     }
 
     local win = vim.api.nvim_open_win(bufnr, false, opts) -- Still no initial focus
