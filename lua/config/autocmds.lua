@@ -60,6 +60,7 @@ aucmd({ 'BufReadPost', 'BufNewFile' }, {
   callback = function()
     vim.opt.statusline = '%!v:lua.require("config.statusline").StatusLine()'
   end,
+  once = true
 })
 
 -- Redraw statusline on DiagnosticChanged
@@ -77,4 +78,15 @@ aucmd({ 'BufReadPost', 'BufNewFile' }, {
   callback = function()
     require('config.commands')
   end,
+  once = true
+})
+
+-- Lazy load LSP
+aucmd({ 'BufReadPre', 'BufNewFile' }, {
+  group = augroup('LazyLoadLSP'),
+  once = true,
+  callback = function()
+    require('lsp')
+  end,
+  once = true
 })
