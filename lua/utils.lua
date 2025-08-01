@@ -4,6 +4,7 @@ local M = {}
 vim.b.is_zoomed = false
 vim.w.original_window_layout = {}
 
+-- Toggle between maximized and normal window layout
 function M.toggle_maximize_buffer()
   if not vim.b.is_zoomed then
     vim.w.original_window_layout = vim.api.nvim_call_function('winrestcmd', {})
@@ -16,6 +17,7 @@ function M.toggle_maximize_buffer()
   end
 end
 
+-- Center cursor in window, preserving position in insert mode
 function M.cursorMoveAround()
   local win_height = vim.api.nvim_win_get_height(0)
   local cursor_winline = vim.fn.winline()
@@ -80,6 +82,14 @@ function M.git_diff()
   end, { buffer = true, desc = 'Quit diff and close scratch buffer(s)' })
 end
 
+-- Calculate startup time and format as a message string
+local function get_startup_time_message(prefix)
+  local startup_time_ns = vim.uv.hrtime() - vim.g.start_time
+  local startup_time_ms = startup_time_ns / 1000000
+  return (prefix or 'Loaded in ') .. string.format('%.2f', startup_time_ms) .. 'ms'
+end
+
+-- Display a centered startup screen with optional custom message and loading time
 function M.show_startup_screen(custom_message, show_loading)
   -- Only show startup screen when no files are opened
   if vim.fn.argc() > 0 then return end
@@ -97,10 +107,7 @@ function M.show_startup_screen(custom_message, show_loading)
 
   if custom_message == nil then
     -- No arguments passed - show only startup time
-    local startup_time_ns = vim.uv.hrtime() - vim.g.start_time
-    local startup_time_ms = startup_time_ns / 1000000
-    local loading_message = 'Neovim loaded in ' .. string.format('%.2f', startup_time_ms) .. 'ms'
-    table.insert(message_lines, loading_message)
+    table.insert(message_lines, get_startup_time_message('Neovim loaded in '))
   elseif custom_message == '' and show_loading == false then
     -- Empty message with no loading - show nothing
     message_lines = {}
@@ -117,12 +124,7 @@ function M.show_startup_screen(custom_message, show_loading)
     end
 
     -- Add loading message if show_loading is not explicitly false
-    if show_loading ~= false then
-      local startup_time_ns = vim.uv.hrtime() - vim.g.start_time
-      local startup_time_ms = startup_time_ns / 1000000
-      local loading_message = 'Loaded in ' .. string.format('%.2f', startup_time_ms) .. 'ms'
-      table.insert(message_lines, loading_message)
-    end
+    if show_loading ~= false then table.insert(message_lines, get_startup_time_message()) end
   end
 
   -- If no message lines, just set up empty buffer and return
@@ -213,6 +215,7 @@ function M.show_startup_screen(custom_message, show_loading)
   vim.g.startup_buffer_id = vim.api.nvim_get_current_buf()
 end
 
+-- Restore UI settings when leaving startup screen
 function M.restore_ui_settings()
   local current_buf = vim.api.nvim_get_current_buf()
   if current_buf ~= vim.g.startup_buffer_id then
@@ -220,6 +223,21 @@ function M.restore_ui_settings()
     vim.wo.signcolumn = 'yes:2'
     vim.o.laststatus = 2 -- Show statusline always
     vim.o.ruler = true -- Restore ruler
+  end
+end
+
+-- Lazy loading utilities
+-- Create a lazy loader for modules to improve startup time
+function M.lazy_require(module_name)
+  local loaded = false
+  local module = nil
+
+  return function()
+    if not loaded then
+      module = require(module_name)
+      loaded = true
+    end
+    return module
   end
 end
 
