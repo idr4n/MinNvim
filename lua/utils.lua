@@ -130,9 +130,9 @@ function M.show_startup_screen(custom_message, show_loading)
   -- If no message lines, just set up empty buffer and return
   if #message_lines == 0 then
     -- Configure buffer settings for empty startup screen
-    vim.api.nvim_buf_set_option(0, 'modified', false)
-    vim.api.nvim_buf_set_option(0, 'bufhidden', 'wipe')
-    vim.api.nvim_buf_set_option(0, 'swapfile', false)
+    vim.api.nvim_set_option_value('modified', false, { buf = 0 })
+    vim.api.nvim_set_option_value('bufhidden', 'wipe', { buf = 0 })
+    vim.api.nvim_set_option_value('swapfile', false,  { buf = 0 })
 
     -- Hide all UI elements
     vim.wo.cursorline = false
@@ -158,7 +158,7 @@ function M.show_startup_screen(custom_message, show_loading)
   local start_row = math.floor((height - total_message_height) / 2)
 
   -- Add empty lines before message
-  for i = 1, start_row do
+  for _ = 1, start_row do
     table.insert(lines, '')
   end
 
@@ -174,7 +174,7 @@ function M.show_startup_screen(custom_message, show_loading)
 
   -- Add remaining empty lines
   local remaining_lines = height - start_row - total_message_height
-  for i = 1, remaining_lines do
+  for _ = 1, remaining_lines do
     table.insert(lines, '')
   end
 
@@ -182,11 +182,11 @@ function M.show_startup_screen(custom_message, show_loading)
   vim.api.nvim_buf_set_lines(0, 0, -1, false, lines)
 
   -- Clear the modified flag so no [+] appears
-  vim.api.nvim_buf_set_option(0, 'modified', false)
+  vim.api.nvim_set_option_value('modified', false, { buf = 0 })
 
   -- Configure buffer settings
-  vim.api.nvim_buf_set_option(0, 'bufhidden', 'wipe')
-  vim.api.nvim_buf_set_option(0, 'swapfile', false)
+  vim.api.nvim_set_option_value('bufhidden', 'wipe', { buf = 0 })
+  vim.api.nvim_set_option_value('swapfile', false, { buf = 0 })
 
   -- Modern highlighting with extmarks
   vim.api.nvim_set_hl(0, 'Startup', { fg = '#555555' })
