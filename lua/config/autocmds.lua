@@ -53,6 +53,14 @@ aucmd("BufReadPost", {
   end,
 })
 
+-- Highlight on yank
+vim.api.nvim_create_autocmd("TextYankPost", {
+  group = augroup('HighlightOnYank'),
+  callback = function()
+    vim.highlight.on_yank({ timeout = 70 })
+  end,
+})
+
 -- Lazy load statusline
 aucmd({ 'BufReadPost', 'BufNewFile' }, {
   group = augroup('LazyLoadStatusline'),
