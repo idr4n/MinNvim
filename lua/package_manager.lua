@@ -12,7 +12,7 @@ M.loaded_plugins = {}
 ---@field build? string|function String command or function to run after install/update
 ---@field event? string|string[] Event name or table of events for lazy loading
 ---@field ft? string|string[] Filetype or table of filetypes for lazy loading
----@field keys? string|string[]|table Key mapping(s) for lazy loading (string, array, or LazyVim format)
+---@field keys? string|string[]|table[] Key mapping(s) for lazy loading (string, array, or LazyVim format)
 ---@field cmd? string|string[] Command name or table of commands for lazy loading
 ---@field config? function Setup function (runs only once after loading)
 ---@field dependencies? string|string[] Dependency plugin source(s)
