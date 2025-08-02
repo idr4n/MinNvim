@@ -6,6 +6,7 @@ local p = manager.add
 --: Lazy load treesitter {{{
 p({
   src = 'nvim-treesitter/nvim-treesitter',
+  -- enabled = false,
   event = { 'BufReadPost', 'BufNewFile', 'BufWritePre' },
   config = function()
     vim.pack.add({ 'nvim-treesitter/nvim-treesitter' })
@@ -25,7 +26,7 @@ p({
   config = function()
     local minidiff = require('mini.diff')
     minidiff.setup({
-      view = { signs = { add = ' +', change = ' ~', delete = ' -' } },
+      view = { signs = { add = ' ┃', change = ' ┃', delete = ' _' } },
       mappings = {
         apply = '<leader>hs',
         reset = '<leader>hS',
@@ -145,6 +146,10 @@ p({
   keys = {
     { 'n', '<C-Space>', '<cmd>FzfLua files<cr>', { desc = 'FzfLua Files' } },
     { 'n', '<leader>sk', '<cmd>FzfLua keymaps<cr>', { desc = 'FzfLua Keymaps' } },
+    { 'n', '<leader>r', '<cmd>FzfLua live_grep<cr>', { desc = 'FzfLua Live Grep' } },
+    { 'n', '<leader>gs', function ()
+      require("fzf-lua").git_status({ winopts = { preview = { hidden = false } } })
+    end, { desc = 'FzfLua Git Status' } },
   },
 })
 --: }}}
@@ -194,7 +199,7 @@ p({
   src = 'saghen/blink.cmp',
   event = 'InsertEnter',
   -- version = 'v1.6.0',
-  build = "cargo build --release",
+  build = 'cargo build --release',
   config = function()
     require('blink.cmp').setup({
       cmdline = {
@@ -248,7 +253,7 @@ p({
 })
 --: }}}
 
---: zk-nvim {{{
+--: Lazy load zk-nvim {{{
 p({
   src = 'zk-org/zk-nvim',
   dependencies = { 'ibhagwan/fzf-lua' },

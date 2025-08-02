@@ -72,13 +72,12 @@ function M.resolve_dependency(dep_spec)
   -- "https://github.com/user/repo" -> find by full URL
 
   -- Create spec to get normalized name
-  local dep_plugin = M.create_spec({ src = dep_spec }, { lazy = false })
+  local dep_plugin = M.create_spec({ src = dep_spec })
 
   -- Check if plugin with that name already exists
   if M.plugins[dep_plugin.name] then return M.plugins[dep_plugin.name] end
 
   -- If not found, add the created spec to plugins
-  print('Creating missing dependency: ' .. dep_spec)
   M.plugins[dep_plugin.name] = dep_plugin
   return dep_plugin
 end
