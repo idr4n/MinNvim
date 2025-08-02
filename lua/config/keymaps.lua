@@ -171,9 +171,9 @@ keyset({ "n", "t" }, "<A-,>", require("utils").toggle_maximize_buffer, { desc = 
 keyset("n", "<leader>e", function() vim.api.nvim_feedkeys(":find **/*", "n", false) end, { desc = "Switch buffer" })
 keyset("n", "<leader>gd", require("utils").git_diff, { desc = "Diff with git HEAD" })
 keyset('n', '<C-P>', function ()
-  local pick = require('utils').lazy_require('pick')
-  pick().pick_definition()
-end, { desc = 'Pick Definition' })
+  local peek = require('utils').lazy_require('peek')
+  peek().peek_definition()
+end, { desc = 'Peek Definition' })
 
 -- Add undo break-points
 keymap("i", ",", ",<c-g>u")

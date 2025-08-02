@@ -22,7 +22,7 @@ local function format_path_for_title(filepath, max_length)
   return display_path
 end
 
-function M.pick_definition()
+function M.peek_definition()
   local clients = vim.lsp.get_clients({ bufnr = 0 })
   if #clients == 0 then
     print('No LSP client attached')
@@ -90,20 +90,20 @@ function M.pick_definition()
     vim.api.nvim_win_call(win, function() vim.cmd('normal! zz') end)
 
     -- Add temporary highlighting to the definition line
-    local ns_id = vim.api.nvim_create_namespace('definition_highlight')
+    local ns_id = vim.api.nvim_create_namespace('peek_highlight')
     local line_content = vim.api.nvim_buf_get_lines(bufnr, line - 1, line, false)[1] or ''
     local line_length = #line_content
     vim.api.nvim_buf_set_extmark(bufnr, ns_id, line - 1, 0, {
       end_row = line - 1,
       end_col = line_length > 0 and line_length or 1, -- Highlight entire line
-      hl_group = 'Search',
+      hl_group = 'IncSearch',
       priority = 200,
     })
 
-    -- Auto-remove highlight after 1 second
+    -- Auto-remove highlight after 2 seconds
     vim.defer_fn(function()
       if vim.api.nvim_buf_is_valid(bufnr) then vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1) end
-    end, 1000)
+    end, 2000)
 
     -- Function to close the popup
     local function close_popup()
