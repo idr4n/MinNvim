@@ -32,7 +32,6 @@ function M.peek_definition()
   local client = clients[1]
   local params = vim.lsp.util.make_position_params(0, client.offset_encoding)
 
-  -- Changed from 'textDocument/implementation' to 'textDocument/definition'
   vim.lsp.buf_request(0, 'textDocument/definition', params, function(err, result, ctx, config)
     if err or not result or vim.tbl_isempty(result) then
       print('No definition found')
@@ -81,13 +80,16 @@ function M.peek_definition()
 
     local win = vim.api.nvim_open_win(bufnr, false, opts) -- Still no initial focus
 
+    -- Disable scrolloff for this popup window
+    vim.api.nvim_set_option_value('scrolloff', 0, { win = win })
+
     -- Jump to the definition line in the popup
     local line = range.start.line + 1
     local col = range.start.character
     vim.api.nvim_win_set_cursor(win, { line, col })
 
-    -- Center the line in the popup window
-    vim.api.nvim_win_call(win, function() vim.cmd('normal! zz') end)
+    -- Position the definition line as the first line in the popup window
+    vim.api.nvim_win_call(win, function() vim.fn.winrestview({ topline = line, lnum = line, col = col }) end)
 
     -- Add temporary highlighting to the definition line
     local ns_id = vim.api.nvim_create_namespace('peek_highlight')
@@ -105,6 +107,10 @@ function M.peek_definition()
       if vim.api.nvim_buf_is_valid(bufnr) then vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1) end
     end, 2000)
 
+    -- Store original buffer and window for smart auto-close
+    local original_buf = vim.api.nvim_get_current_buf()
+    local original_win = vim.api.nvim_get_current_win()
+
     -- Function to close the popup
     local function close_popup()
       if vim.api.nvim_win_is_valid(win) then
@@ -121,9 +127,19 @@ function M.peek_definition()
       silent = true,
     })
 
-    -- Store original buffer and window for smart auto-close
-    local original_buf = vim.api.nvim_get_current_buf()
-    local original_win = vim.api.nvim_get_current_win()
+    -- Add a keymap to focus the popup window
+    vim.keymap.set('n', '<C-w>p', function()
+      if vim.api.nvim_win_is_valid(win) then vim.api.nvim_set_current_win(win) end
+    end, { buffer = original_buf, desc = 'Peek - Focus definition popup' })
+
+    -- Add conditional keymaps that only work while popup is active
+    vim.keymap.set('n', '<C-f>', function()
+      if vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_call(win, function() vim.cmd('normal! \5') end) end
+    end, { buffer = original_buf })
+
+    vim.keymap.set('n', '<C-b>', function()
+      if vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_call(win, function() vim.cmd('normal! \25') end) end
+    end, { buffer = original_buf })
 
     -- Smart auto-close: only close when cursor moves in the ORIGINAL buffer
     local close_autocmd = vim.api.nvim_create_autocmd({ 'CursorMoved', 'CursorMovedI' }, {
@@ -161,11 +177,6 @@ function M.peek_definition()
         if close_autocmd then vim.api.nvim_del_autocmd(close_autocmd) end
       end,
     })
-
-    -- Optional: Add a keymap to focus the popup window
-    vim.keymap.set('n', '<C-w>p', function()
-      if vim.api.nvim_win_is_valid(win) then vim.api.nvim_set_current_win(win) end
-    end, { buffer = original_buf, desc = 'Focus definition popup' })
   end)
 end
 
