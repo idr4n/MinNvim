@@ -87,7 +87,7 @@ local function create_close_function(win, bufnr, ns_id)
 end
 
 -- Set up popup keymaps
-local function setup_popup_keymaps(win, bufnr, original_buf, close_popup)
+local function setup_popup_keymaps(win, bufnr, original_buf, close_popup, copy_callback)
   vim.keymap.set('n', 'q', close_popup, {
     buffer = bufnr,
     noremap = true,
@@ -105,6 +105,21 @@ local function setup_popup_keymaps(win, bufnr, original_buf, close_popup)
   vim.keymap.set('n', '<C-b>', function()
     if vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_call(win, function() vim.cmd('normal! \25') end) end
   end, { buffer = original_buf })
+
+  if copy_callback then
+    vim.keymap.set('n', 'yp', copy_callback, {
+      buffer = bufnr,
+      noremap = true,
+      silent = true,
+      desc = 'Copy to clipboard',
+    })
+    vim.keymap.set('n', 'yp', copy_callback, {
+      buffer = original_buf,
+      noremap = true,
+      silent = true,
+      desc = 'Copy to clipboard',
+    })
+  end
 end
 
 -- Set up popup autocmds
@@ -143,12 +158,12 @@ local function setup_popup_autocmds(win, original_buf, original_win, close_popup
 end
 
 -- Set up popup window keymaps and autocmds
-local function setup_popup_management(win, bufnr, ns_id)
+local function setup_popup_management(win, bufnr, ns_id, copy_callback)
   local original_buf = vim.api.nvim_get_current_buf()
   local original_win = vim.api.nvim_get_current_win()
 
   local close_popup = create_close_function(win, bufnr, ns_id)
-  setup_popup_keymaps(win, bufnr, original_buf, close_popup)
+  setup_popup_keymaps(win, bufnr, original_buf, close_popup, copy_callback)
   setup_popup_autocmds(win, original_buf, original_win, close_popup)
 end
 
@@ -191,6 +206,97 @@ local function peek_lsp_result(lsp_method, title_prefix, no_result_msg)
     local ns_id = add_line_highlight(bufnr, line)
     setup_popup_management(win, bufnr, ns_id)
   end)
+end
+
+-- Create diagnostics popup buffer with formatted content
+local function create_diagnostics_buffer()
+  local diagnostics = vim.diagnostic.get(0)
+  if #diagnostics == 0 then return nil, 'No diagnostics found' end
+
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  local lines = {}
+  local diagnostic_data = {}
+
+  for _, diagnostic in ipairs(diagnostics) do
+    local severity = vim.diagnostic.severity[diagnostic.severity]
+    local line_num = diagnostic.lnum + 1
+    local col_num = diagnostic.col + 1
+    local message = diagnostic.message:gsub('\n', ' ')
+
+    local formatted_line = string.format('[%s] Line %d:%d - %s', severity, line_num, col_num, message)
+    table.insert(lines, formatted_line)
+    table.insert(diagnostic_data, diagnostic)
+  end
+
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+  vim.api.nvim_set_option_value('modifiable', false, { buf = bufnr })
+  vim.api.nvim_set_option_value('filetype', 'diagnostics', { buf = bufnr })
+
+  return bufnr, nil, diagnostic_data
+end
+
+-- Create copy callback for diagnostics
+local function create_diagnostics_copy_callback(diagnostic_data)
+  return function()
+    if not diagnostic_data then
+      print('No diagnostic data available')
+      return
+    end
+
+    local all_diagnostics = {}
+    for _, diagnostic in ipairs(diagnostic_data) do
+      local severity = vim.diagnostic.severity[diagnostic.severity]
+      local line_num = diagnostic.lnum + 1
+      local col_num = diagnostic.col + 1
+      local message = diagnostic.message
+
+      table.insert(
+        all_diagnostics,
+        string.format('[%s] %s:%d:%d - %s', severity, vim.fn.expand('%'), line_num, col_num, message)
+      )
+    end
+
+    local content = table.concat(all_diagnostics, '\n')
+    vim.fn.setreg('+', content)
+    print('Diagnostics copied to clipboard')
+  end
+end
+
+-- Set up diagnostics navigation keymaps
+local function setup_diagnostics_navigation(win, bufnr, diagnostic_data)
+  vim.keymap.set('n', '<CR>', function()
+    if not diagnostic_data then
+      print('No diagnostic data available')
+      return
+    end
+
+    local cursor = vim.api.nvim_win_get_cursor(win)
+    local line_idx = cursor[1]
+    if diagnostic_data[line_idx] then
+      local diagnostic = diagnostic_data[line_idx]
+      vim.api.nvim_win_close(win, true)
+      vim.api.nvim_win_set_cursor(0, { diagnostic.lnum + 1, diagnostic.col })
+    end
+  end, { buffer = bufnr, desc = 'Jump to diagnostic' })
+end
+
+function M.peek_diagnostics()
+  local diagnostics_bufnr, err, diagnostic_data = create_diagnostics_buffer()
+  if not diagnostics_bufnr then
+    print(err)
+    return
+  end
+
+  local current_file = vim.fn.expand('%:t')
+  local title = ' Diagnostics @' .. current_file .. ' '
+  local win = create_popup_window(diagnostics_bufnr, title)
+  vim.api.nvim_set_option_value('wrap', false, { win = win })
+
+  local copy_callback = create_diagnostics_copy_callback(diagnostic_data)
+  local ns_id = vim.api.nvim_create_namespace('peek_diagnostics')
+
+  setup_popup_management(win, diagnostics_bufnr, ns_id, copy_callback)
+  setup_diagnostics_navigation(win, diagnostics_bufnr, diagnostic_data)
 end
 
 function M.peek_definition() peek_lsp_result('textDocument/definition', 'Definition', 'No definition found') end
