@@ -118,12 +118,23 @@ function M.load_plugin(spec)
     name = spec.name,
     version = spec.version,
   }
-  vim.pack.add({ pack_spec })
 
-  -- If plugin was just installed and has build command, run it
+  -- If plugin was just installed and has build command, install without loading, build, then load
   if not already_installed and spec.build then
-    print('Running build for newly installed plugin: ' .. spec.name)
-    M.run_build(spec)
+    -- Add without loading to prevent plugin files from executing before build
+    vim.pack.add({ pack_spec }, { load = false })
+    print('Building ' .. spec.name .. '...')
+    local build_success = M.run_build(spec)
+    if build_success then
+      -- Now load the plugin after successful build
+      vim.cmd('packadd ' .. spec.name)
+    else
+      print('Build failed for ' .. spec.name .. ', plugin not loaded')
+      return
+    end
+  else
+    -- Normal add (plugin already built or no build needed)
+    vim.pack.add({ pack_spec })
   end
 
   -- Mark as loaded first to prevent recursion
