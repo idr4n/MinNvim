@@ -136,24 +136,53 @@ function M.lsp_diagnostics(opts)
 
   if result.errors > 0 then
     errors = M.get_or_create_hl('DiagnosticError', 'StatusLine') .. icon
-    if show_count then errors = errors .. result.errors .. ' ' end
+    if show_count then errors = errors .. result.errors end
   end
   if result.warnings > 0 then
     warnings = M.get_or_create_hl('DiagnosticWarn', 'StatusLine') .. icon
-    if show_count then warnings = warnings .. result.warnings .. ' ' end
+    if show_count then warnings = warnings .. result.warnings end
   end
   if result.info > 0 then
     info = M.get_or_create_hl('DiagnosticInfo', 'StatusLine') .. icon
-    if show_count then info = info .. result.info .. ' ' end
+    if show_count then info = info .. result.info end
   end
   if result.hints > 0 then
     hints = M.get_or_create_hl('DiagnosticHint', 'StatusLine') .. icon
-    if show_count then hints = hints .. result.hints .. ' ' end
+    if show_count then hints = hints .. result.hints end
   end
 
-  if vim.bo.modifiable and total > 0 then return warnings .. errors .. info .. hints .. (show_count and '' or ' ') end
+  if vim.bo.modifiable and total > 0 then return (warnings .. errors .. info .. hints .. ' ') or '' end
 
   return ''
+end
+
+---@return string
+function M.git_status_simple()
+  local gitsigns = vim.b.minidiff_summary
+
+  if not gitsigns then return '' end
+
+  local diff_icon = '▪'
+  local total_changes = 0
+
+  total_changes = (gitsigns.add or 0) + (gitsigns.change or 0) + (gitsigns.delete or 0)
+  local added = ''
+  local changed = ''
+  local removed = ''
+
+  if gitsigns.add and gitsigns.add > 0 then
+    added = M.get_or_create_hl('MiniDiffSignAdd', 'StatusLine') .. diff_icon .. gitsigns.add
+  end
+
+  if gitsigns.change and gitsigns.change > 0 then
+    changed = M.get_or_create_hl('MiniDiffSignChange', 'StatusLine') .. diff_icon .. gitsigns.change
+  end
+
+  if gitsigns.delete and gitsigns.delete > 0 then
+    removed = M.get_or_create_hl('MiniDiffSignDelete', 'StatusLine') .. diff_icon .. gitsigns.delete
+  end
+
+  return total_changes > 0 and added .. changed .. removed .. ' ' or ''
 end
 
 ---Generate the complete statusline string
@@ -164,6 +193,7 @@ function M.StatusLine()
     '%=',
     M.get_position(),
     M.lsp_diagnostics({ show_count = true }),
+    M.git_status_simple(),
   }
 
   return table.concat(components)
