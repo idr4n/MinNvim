@@ -339,6 +339,13 @@ function M.install()
   print('Installation completed!')
 end
 
+-- Helper function to append lines to a buffer
+local function append_to_buffer(buf, lines)
+  local line_count = vim.api.nvim_buf_line_count(buf)
+  local lines_to_add = type(lines) == 'string' and { lines } or lines
+  vim.api.nvim_buf_set_lines(buf, line_count, line_count, false, lines_to_add)
+end
+
 -- Update enabled plugins using vim.pack.update()
 function M.update(opts)
   opts = opts or {}
@@ -353,16 +360,43 @@ function M.update(opts)
 
   print('Updating plugins...')
 
+  -- Create debug scratch buffer once
+  local buf = vim.api.nvim_create_buf(false, true)
+  vim.api.nvim_buf_set_name(buf, 'Pack Update Debug')
+  vim.api.nvim_open_win(buf, true, {
+    split = 'right',
+    width = 50,
+  })
+  append_to_buffer(buf, {
+    'Pack Update Debug Log',
+    '=====================',
+    'Waiting for updates to be confirmed...',
+    '',
+  })
+
   -- Use vim.pack.update with the new API
   vim.pack.update(enabled_names, { force = force })
 
-  -- Run build commands after update
-  vim.schedule(function()
-    for _, spec in pairs(M.plugins) do
-      if spec.enabled and spec.build then M.run_build(spec) end
-    end
-    print('Update completed!')
-  end)
+  -- Track PackChanged events and build
+  vim.g.need_build_packs = {}
+  local update_group = vim.api.nvim_create_augroup('simple-pack-update-' .. vim.fn.localtime(), { clear = true })
+
+  vim.api.nvim_create_autocmd('User', {
+    pattern = 'PackChanged',
+    group = update_group,
+    callback = function(event)
+      if event.data and event.data.kind == 'update' and event.data.spec then
+        local plugin_name = event.data.spec.name
+        append_to_buffer(buf, 'PackChanged event: ' .. plugin_name .. ' (updated)')
+
+        local spec = M.plugins[plugin_name]
+        if spec and spec.build then
+          table.insert(vim.g.need_build_packs, plugin_name)
+          append_to_buffer(buf, '- ' .. plugin_name .. ' needs to be built.')
+        end
+      end
+    end,
+  })
 end
 
 -- Remove disabled plugins using vim.pack.del()
@@ -462,5 +496,44 @@ vim.api.nvim_create_user_command('PackSync', function(opts)
   local force = opts.bang
   M.sync({ force = force })
 end, { desc = 'Sync plugins: install, update, clean (use ! to force)', bang = true })
+
+vim.api.nvim_create_user_command('PackBuild', function(opts)
+  if opts.args and opts.args ~= '' then
+    -- Build specific plugin
+    local plugin_name = opts.args
+    local spec = M.plugins[plugin_name]
+    if spec and spec.build then
+      print('Building ' .. plugin_name .. '...')
+      M.run_build(spec)
+    else
+      print('Plugin "' .. plugin_name .. '" not found or has no build command.')
+    end
+  elseif vim.g.need_build_packs and #vim.g.need_build_packs > 0 then
+    -- Build all plugins from need_build_packs
+    print('Building plugins from need_build_packs...')
+    for _, plugin_name in ipairs(vim.g.need_build_packs) do
+      local spec = M.plugins[plugin_name]
+      if spec and spec.build then
+        print('Building ' .. plugin_name .. '...')
+        M.run_build(spec)
+      end
+    end
+    -- Clear the list after building
+    vim.g.need_build_packs = {}
+  else
+    print('No plugins to build. Use :PackBuild <plugin_name> or run :PackUpdate first.')
+  end
+end, {
+  nargs = '?',
+  desc = 'Build specific plugin or all plugins with pendign builds',
+  complete = function()
+    -- Tab completion with plugin names that have build commands
+    local completions = {}
+    for name, spec in pairs(M.plugins) do
+      if spec.build then table.insert(completions, name) end
+    end
+    return completions
+  end,
+})
 
 return M
