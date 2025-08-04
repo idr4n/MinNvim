@@ -41,10 +41,10 @@ keyset('n', '<leader>x', ':bdelete<CR>', { desc = 'Delete Buffer and Window' })
 keyset('n', ',A', 'ggVG<c-$>', { desc = 'Select All' })
 
 -- Comment mappings
-keyset('n', '<C-c>', 'gcc', { noremap = false, desc = 'Comment line' })
-keyset('x', '<C-c>', 'gc', { noremap = false, desc = 'Comment select' })
-keyset('n', 'gcy', 'gcc:t.<cr>gcc', { noremap = false, desc = 'Duplicate-comment line' })
-keyset('v', 'gy', ":t'><cr>gvgcgv<esc>", { noremap = false, desc = 'Duplicate and comment' })
+keyset('n', '<C-c>', 'gcc', { remap = true, desc = 'Comment line' })
+keyset('x', '<C-c>', 'gc', { remap = true, desc = 'Comment select' })
+keyset('n', 'gcy', 'gcc:t.<cr>gcc', { remap = true, noremap = false, desc = 'Duplicate-comment line' })
+keyset('v', 'gy', ":t'><cr>gvgcgv<esc>", { remap = true, desc = 'Duplicate and comment' })
 
 -- Buffer navigation
 keyset('n', '<S-l>', ':bnext<CR>')
