@@ -171,15 +171,15 @@ function M.git_status_simple()
   local removed = ''
 
   if gitsigns.add and gitsigns.add > 0 then
-    added = M.get_or_create_hl('MiniDiffSignAdd', 'StatusLine') .. diff_icon .. gitsigns.add
+    added = M.get_or_create_hl('MiniDiffSignAdd', 'StatusLine') .. diff_icon
   end
 
   if gitsigns.change and gitsigns.change > 0 then
-    changed = M.get_or_create_hl('MiniDiffSignChange', 'StatusLine') .. diff_icon .. gitsigns.change
+    changed = M.get_or_create_hl('MiniDiffSignChange', 'StatusLine') .. diff_icon
   end
 
   if gitsigns.delete and gitsigns.delete > 0 then
-    removed = M.get_or_create_hl('MiniDiffSignDelete', 'StatusLine') .. diff_icon .. gitsigns.delete
+    removed = M.get_or_create_hl('MiniDiffSignDelete', 'StatusLine') .. diff_icon
   end
 
   return total_changes > 0 and added .. changed .. removed .. ' ' or ''
@@ -192,7 +192,7 @@ function M.StatusLine()
     M.fileinfo(),
     '%=',
     M.get_position(),
-    M.lsp_diagnostics({ show_count = true }),
+    M.lsp_diagnostics({ show_count = false }),
     M.git_status_simple(),
   }
 
