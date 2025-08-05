@@ -533,7 +533,7 @@ local function process_plugin_updates_sequential(plugins_to_update, debug_buf)
     local spec = info.spec
     append_to_buffer(debug_buf, '  Updating ' .. spec.name .. '...')
 
-    vim.pack.update({ spec.name }, { force = true })
+    vim.schedule(function() vim.pack.update({ spec.name }, { force = true }) end)
 
     -- Monitor until update completes (hash matches expected)
     local function wait_for_update_completion()
