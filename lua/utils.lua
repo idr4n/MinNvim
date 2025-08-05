@@ -61,10 +61,20 @@ function M.git_diff()
     return
   end
 
+  -- Get the file path relative to git root
+  local git_root = vim.fn.system('git rev-parse --show-toplevel'):gsub('\n', '')
+  if vim.v.shell_error ~= 0 then
+    print('Not in a git repository')
+    return
+  end
+
+  local absolute_file = vim.fn.expand('%:p')
+  local relative_file = vim.fn.fnamemodify(absolute_file, ':s?' .. git_root .. '/??')
+
   -- Create vertical split with git HEAD version
   vim.cmd('vert new')
   vim.cmd('set bt=nofile')
-  vim.cmd('r !git show HEAD:' .. vim.fn.shellescape(current_file))
+  vim.cmd('r !git show HEAD:' .. vim.fn.shellescape(relative_file))
   vim.cmd('0d_')
   vim.cmd('diffthis')
   vim.cmd('wincmd p')
@@ -132,7 +142,7 @@ function M.show_startup_screen(custom_message, show_loading)
     -- Configure buffer settings for empty startup screen
     vim.api.nvim_set_option_value('modified', false, { buf = 0 })
     vim.api.nvim_set_option_value('bufhidden', 'wipe', { buf = 0 })
-    vim.api.nvim_set_option_value('swapfile', false,  { buf = 0 })
+    vim.api.nvim_set_option_value('swapfile', false, { buf = 0 })
 
     -- Hide all UI elements
     vim.wo.cursorline = false
