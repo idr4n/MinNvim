@@ -36,8 +36,10 @@ local function calculate_zindex()
 end
 
 -- Create and configure popup window
-local function create_popup_window(bufnr, title)
-  local opts = {
+local function create_popup_window(bufnr, title, custom_opts)
+  custom_opts = custom_opts or {}
+
+  local default_opts = {
     style = 'minimal',
     relative = 'cursor',
     width = 80,
@@ -50,15 +52,22 @@ local function create_popup_window(bufnr, title)
     zindex = calculate_zindex(),
   }
 
+  -- Merge custom options with defaults
+  local opts = vim.tbl_deep_extend('force', default_opts, custom_opts)
+
   local win = vim.api.nvim_open_win(bufnr, false, opts)
   vim.api.nvim_set_option_value('scrolloff', 0, { win = win })
+  vim.api.nvim_set_option_value('wrap', false, { win = win })
 
   return win
 end
 
--- Add highlighting to definition line
-local function add_line_highlight(bufnr, line)
-  local ns_id = vim.api.nvim_create_namespace('peek_highlight')
+-- Add highlighting to line with configurable duration
+local function add_line_highlight(bufnr, line, duration, namespace_suffix)
+  duration = duration or 2000
+  namespace_suffix = namespace_suffix or 'highlight'
+
+  local ns_id = vim.api.nvim_create_namespace('peek_' .. namespace_suffix)
   local line_content = vim.api.nvim_buf_get_lines(bufnr, line - 1, line, false)[1] or ''
   local line_length = #line_content
 
@@ -69,11 +78,22 @@ local function add_line_highlight(bufnr, line)
     priority = 200,
   })
 
-  vim.defer_fn(function()
-    if vim.api.nvim_buf_is_valid(bufnr) then vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1) end
-  end, 2000)
+  -- Only set timeout if duration > 0 (permanent highlight if duration is 0 or nil)
+  if duration > 0 then
+    vim.defer_fn(function()
+      if vim.api.nvim_buf_is_valid(bufnr) then vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1) end
+    end, duration)
+  end
 
   return ns_id
+end
+
+-- Clear highlight namespace
+local function clear_line_highlight(bufnr, namespace_suffix)
+  if vim.api.nvim_buf_is_valid(bufnr) then
+    local ns_id = vim.api.nvim_create_namespace('peek_' .. namespace_suffix)
+    vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
+  end
 end
 
 -- Create popup close function
@@ -98,28 +118,8 @@ local function setup_popup_keymaps(win, bufnr, original_buf, close_popup, copy_c
     if vim.api.nvim_win_is_valid(win) then vim.api.nvim_set_current_win(win) end
   end, { buffer = original_buf, desc = 'Peek - Focus popup' })
 
-  vim.keymap.set('n', '<C-f>', function()
-    if vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_call(win, function() vim.cmd('normal! \5') end) end
-  end, { buffer = original_buf })
-
-  vim.keymap.set('n', '<C-b>', function()
-    if vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_call(win, function() vim.cmd('normal! \25') end) end
-  end, { buffer = original_buf })
-
-  if copy_callback then
-    vim.keymap.set('n', 'yp', copy_callback, {
-      buffer = bufnr,
-      noremap = true,
-      silent = true,
-      desc = 'Copy to clipboard',
-    })
-    vim.keymap.set('n', 'yp', copy_callback, {
-      buffer = original_buf,
-      noremap = true,
-      silent = true,
-      desc = 'Copy to clipboard',
-    })
-  end
+  -- Copy callback if provided (for diagnostics)
+  if copy_callback then vim.keymap.set('n', 'y', copy_callback, { buffer = bufnr, desc = 'Copy content' }) end
 end
 
 -- Set up popup autocmds
@@ -178,7 +178,7 @@ local function peek_lsp_result(lsp_method, title_prefix, no_result_msg)
   local client = clients[1]
   local params = vim.lsp.util.make_position_params(0, client.offset_encoding)
 
-  vim.lsp.buf_request(0, lsp_method, params, function(err, result, ctx, config)
+  vim.lsp.buf_request(0, lsp_method, params, function(err, result)
     if err or not result or vim.tbl_isempty(result) then
       print(no_result_msg)
       return
@@ -203,7 +203,7 @@ local function peek_lsp_result(lsp_method, title_prefix, no_result_msg)
 
     vim.api.nvim_win_call(win, function() vim.fn.winrestview({ topline = line, lnum = line, col = col }) end)
 
-    local ns_id = add_line_highlight(bufnr, line)
+    local ns_id = add_line_highlight(bufnr, line, 2000, 'definition_highlight')
     setup_popup_management(win, bufnr, ns_id)
   end)
 end
@@ -263,19 +263,61 @@ local function create_diagnostics_copy_callback(diagnostic_data)
 end
 
 -- Set up diagnostics navigation keymaps
-local function setup_diagnostics_navigation(win, bufnr, diagnostic_data)
+local function setup_diagnostics_navigation(popup_win, bufnr, diagnostic_data, original_win)
+  local current_highlighted_line = nil
+  local original_bufnr = vim.api.nvim_win_get_buf(original_win)
+
+  vim.api.nvim_create_autocmd('CursorMoved', {
+    buffer = bufnr,
+    callback = function()
+      local cursor = vim.api.nvim_win_get_cursor(0)
+      local line_idx = cursor[1]
+      if diagnostic_data[line_idx] and vim.api.nvim_win_is_valid(original_win) then
+        local diagnostic = diagnostic_data[line_idx]
+        local target_line = diagnostic.lnum + 1
+
+        -- Only update if we're highlighting a different line
+        if current_highlighted_line ~= target_line then
+          -- Clear previous highlight
+          if current_highlighted_line then clear_line_highlight(original_bufnr, 'diagnostic_highlight') end
+
+          -- Position diagnostic line with offset from top (5 lines or scrolloff)
+          local scrolloff = vim.api.nvim_get_option_value('scrolloff', { win = original_win })
+          local offset = math.max(5, scrolloff)
+          local line = target_line
+          local col = diagnostic.col
+          local topline = math.max(1, line - offset)
+
+          vim.api.nvim_win_set_cursor(original_win, { line, col })
+          vim.api.nvim_win_call(
+            original_win,
+            function() vim.fn.winrestview({ topline = topline, lnum = line, col = col }) end
+          )
+
+          -- Apply permanent highlight to new diagnostic line
+          add_line_highlight(original_bufnr, target_line, 0, 'diagnostic_highlight')
+          current_highlighted_line = target_line
+        end
+      end
+    end,
+  })
   vim.keymap.set('n', '<CR>', function()
     if not diagnostic_data then
       print('No diagnostic data available')
       return
     end
 
-    local cursor = vim.api.nvim_win_get_cursor(win)
+    local cursor = vim.api.nvim_win_get_cursor(popup_win)
     local line_idx = cursor[1]
     if diagnostic_data[line_idx] then
       local diagnostic = diagnostic_data[line_idx]
-      vim.api.nvim_win_close(win, true)
-      vim.api.nvim_win_set_cursor(0, { diagnostic.lnum + 1, diagnostic.col })
+      -- Clear diagnostic highlight before closing
+      clear_line_highlight(original_bufnr, 'diagnostic_highlight')
+      vim.api.nvim_win_close(popup_win, true)
+      if vim.api.nvim_win_is_valid(original_win) then
+        vim.api.nvim_set_current_win(original_win)
+        vim.api.nvim_win_set_cursor(original_win, { diagnostic.lnum + 1, diagnostic.col })
+      end
     end
   end, { buffer = bufnr, desc = 'Jump to diagnostic' })
 end
@@ -287,16 +329,40 @@ function M.peek_diagnostics()
     return
   end
 
+  local original_win = vim.api.nvim_get_current_win()
   local current_file = vim.fn.expand('%:t')
   local title = ' Diagnostics @' .. current_file .. ' '
-  local win = create_popup_window(diagnostics_bufnr, title)
-  vim.api.nvim_set_option_value('wrap', false, { win = win })
+
+  -- Position popup at bottom-right corner, fixed position
+  local win_height = vim.api.nvim_win_get_height(original_win)
+  local win_width = vim.api.nvim_win_get_width(original_win)
+
+  local popup_width = math.min(80, math.floor(win_width * 0.7))
+  local popup_height = math.min(15, math.floor(win_height * 0.3))
+
+  local win = create_popup_window(diagnostics_bufnr, title, {
+    relative = 'win',
+    win = original_win,
+    width = popup_width,
+    height = popup_height,
+    row = win_height - popup_height - 2,
+    col = win_width - popup_width - 1,
+  })
 
   local copy_callback = create_diagnostics_copy_callback(diagnostic_data)
   local ns_id = vim.api.nvim_create_namespace('peek_diagnostics')
 
-  setup_popup_management(win, diagnostics_bufnr, ns_id, copy_callback)
-  setup_diagnostics_navigation(win, diagnostics_bufnr, diagnostic_data)
+  -- Create custom close function that clears diagnostic highlights
+  local close_with_cleanup = function()
+    clear_line_highlight(vim.api.nvim_win_get_buf(original_win), 'diagnostic_highlight')
+    local close_popup = create_close_function(win, diagnostics_bufnr, ns_id)
+    close_popup()
+  end
+
+  -- Use custom popup management with cleanup
+  setup_popup_keymaps(win, diagnostics_bufnr, vim.api.nvim_get_current_buf(), close_with_cleanup, copy_callback)
+  setup_popup_autocmds(win, vim.api.nvim_get_current_buf(), original_win, close_with_cleanup)
+  setup_diagnostics_navigation(win, diagnostics_bufnr, diagnostic_data, original_win)
 end
 
 function M.peek_definition() peek_lsp_result('textDocument/definition', 'Definition', 'No definition found') end
