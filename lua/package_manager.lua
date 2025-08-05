@@ -341,62 +341,317 @@ end
 
 -- Helper function to append lines to a buffer
 local function append_to_buffer(buf, lines)
-  local line_count = vim.api.nvim_buf_line_count(buf)
-  local lines_to_add = type(lines) == 'string' and { lines } or lines
-  vim.api.nvim_buf_set_lines(buf, line_count, line_count, false, lines_to_add)
+  vim.schedule(function()
+    local line_count = vim.api.nvim_buf_line_count(buf)
+    local lines_to_add = type(lines) == 'string' and { lines } or lines
+    vim.api.nvim_buf_set_lines(buf, line_count, line_count, false, lines_to_add)
+  end)
 end
 
--- Update enabled plugins using vim.pack.update()
+-- Async using vim.loop
+local function get_remote_latest_hash_async(repo_url, callback)
+  local uv = vim.loop
+  local stdout = uv.new_pipe()
+  local stderr = uv.new_pipe()
+  local stdout_data = ''
+  local stderr_data = ''
+
+  local handle = uv.spawn('git', {
+    args = { 'ls-remote', repo_url, 'HEAD' },
+    stdio = { nil, stdout, stderr },
+  }, function(code, _)
+    if stdout then stdout:close() end
+    if stderr then stderr:close() end
+
+    if code == 0 then
+      local hash = stdout_data:match('(%w+)')
+      callback(hash, nil)
+    else
+      callback(nil, 'Failed to fetch remote info: ' .. stderr_data)
+    end
+  end)
+
+  if not handle then
+    callback(nil, 'Failed to spawn git process')
+    return
+  end
+
+  if stdout then
+    uv.read_start(stdout, function(_, data)
+      if data then stdout_data = stdout_data .. data end
+    end)
+  end
+
+  if stderr then
+    uv.read_start(stderr, function(_, data)
+      if data then stderr_data = stderr_data .. data end
+    end)
+  end
+end
+
+-- Get current plugin hash
+local function get_local_hash(plugin_path)
+  if vim.fn.isdirectory(plugin_path) == 0 then return nil, 'Plugin directory does not exist' end
+
+  local cmd = string.format('git -C "%s" rev-parse HEAD', plugin_path)
+  local result = vim.fn.system(cmd)
+  local exit_code = vim.v.shell_error
+
+  if exit_code ~= 0 then return nil, 'Not a git repository or git error' end
+
+  return result:gsub('\n', '')
+end
+
+-- Helper function to create plugin result and update progress
+local function create_result_and_update_progress(
+  spec,
+  plugin_info,
+  local_hash,
+  remote_hash,
+  error,
+  completed,
+  total,
+  debug_buf,
+  suffix
+)
+  local result = {
+    spec = spec,
+    plugin_info = plugin_info,
+    local_hash = local_hash,
+    remote_hash = remote_hash,
+    needs_update = local_hash ~= remote_hash and remote_hash ~= nil,
+    error = error,
+  }
+
+  completed = completed + 1
+  local status_text = suffix and (spec.name .. ' ' .. suffix) or (spec.name .. ' checked')
+  append_to_buffer(debug_buf, string.format('  Progress: %d/%d %s', completed, total, status_text))
+
+  return result, completed
+end
+
+-- Collect update info for all plugins in parallel
+local function collect_update_info_async(plugins, pack_list, debug_buf, callback)
+  local results = {}
+  local pending = 0
+  local completed = 0
+  local total = #plugins -- Total is always the number of plugins we're checking
+
+  -- First, prepare all plugins that can be checked
+  for _, spec in ipairs(plugins) do
+    local plugin_info = nil
+    for _, info in ipairs(pack_list) do
+      if info.spec.name == spec.name then
+        plugin_info = info
+        break
+      end
+    end
+
+    if plugin_info then
+      pending = pending + 1
+
+      -- Get local hash (fast, synchronous)
+      local local_hash = get_local_hash(plugin_info.path)
+
+      if not local_hash then
+        results[spec.name], completed = create_result_and_update_progress(
+          spec,
+          plugin_info,
+          nil,
+          nil,
+          'Failed to get local hash',
+          completed,
+          total,
+          debug_buf
+        )
+        pending = pending - 1
+        if pending == 0 then callback(results) end
+      else
+        -- Start async remote hash collection
+        get_remote_latest_hash_async(spec.src, function(remote_hash, error)
+          results[spec.name], completed = create_result_and_update_progress(
+            spec,
+            plugin_info,
+            local_hash,
+            remote_hash,
+            error,
+            completed,
+            total,
+            debug_buf
+          )
+          pending = pending - 1
+          if pending == 0 then callback(results) end
+        end)
+      end
+    else
+      -- Plugin not installed - still count as completed
+      results[spec.name], completed = create_result_and_update_progress(
+        spec,
+        nil,
+        nil,
+        nil,
+        'Plugin not installed',
+        completed,
+        total,
+        debug_buf,
+        'checked (not installed)'
+      )
+    end
+  end
+
+  if total == 0 then callback(results) end
+end
+
+-- Helper function to handle post-update actions (build or completion message)
+local function handle_plugin_completion(spec, debug_buf, next_action)
+  if spec.build then
+    append_to_buffer(debug_buf, '  Building ' .. spec.name .. '...')
+    local build_success = M.run_build(spec)
+    if build_success then
+      append_to_buffer(debug_buf, '  Build completed for ' .. spec.name)
+    else
+      append_to_buffer(debug_buf, '  Build failed for ' .. spec.name)
+    end
+  else
+    append_to_buffer(debug_buf, '  Updated: ' .. spec.name)
+  end
+
+  -- Move to next action
+  if next_action then vim.defer_fn(next_action, 50) end
+end
+
+-- Process plugins that need updates sequentially
+local function process_plugin_updates_sequential(plugins_to_update, debug_buf)
+  local function process_plugin(index)
+    if index > #plugins_to_update then
+      append_to_buffer(debug_buf, { '', 'Update completed!' })
+      print('Update completed!')
+      return
+    end
+
+    local info = plugins_to_update[index]
+    local spec = info.spec
+    append_to_buffer(debug_buf, '  Updating ' .. spec.name .. '...')
+
+    vim.pack.update({ spec.name }, { force = true })
+
+    -- Monitor until update completes (hash matches expected)
+    local function wait_for_update_completion()
+      local current_hash = get_local_hash(info.plugin_info.path)
+      if current_hash == info.remote_hash then
+        -- Update completed successfully - now build if needed
+        handle_plugin_completion(spec, debug_buf, function() process_plugin(index + 1) end)
+      else
+        -- Still updating, check again in 200ms
+        vim.defer_fn(wait_for_update_completion, 200)
+      end
+    end
+
+    -- Start monitoring after brief delay
+    vim.defer_fn(wait_for_update_completion, 500)
+  end
+
+  if #plugins_to_update > 0 then
+    process_plugin(1)
+  else
+    append_to_buffer(debug_buf, { '', 'No plugins need updating.' })
+    print('No plugins need updating.')
+  end
+end
+
+-- Main update process using two-phase approach
+local function process_plugins_updates(plugins, debug_buf)
+  -- Get plugin info from pack system once
+  local pack_list = vim.pack.get()
+
+  -- Phase 1: Collect all update info in parallel
+  append_to_buffer(debug_buf, 'Collecting update info for ' .. #plugins .. ' plugins...')
+
+  collect_update_info_async(plugins, pack_list, debug_buf, function(results)
+    -- Phase 2: Show summary and process updates sequentially
+    local plugins_to_update = {}
+    local up_to_date = {}
+    local errors = {}
+
+    for name, info in pairs(results) do
+      if info.error then
+        table.insert(errors, name .. ': ' .. info.error)
+      elseif info.needs_update then
+        table.insert(plugins_to_update, info)
+      else
+        table.insert(up_to_date, name)
+      end
+    end
+
+    -- Show summary
+    append_to_buffer(debug_buf, { '', 'Summary:' })
+    if #plugins_to_update > 0 then
+      local update_names = {}
+      for _, info in ipairs(plugins_to_update) do
+        table.insert(update_names, info.spec.name)
+      end
+      append_to_buffer(
+        debug_buf,
+        '  ' .. #plugins_to_update .. ' plugins need updating: ' .. table.concat(update_names, ', ')
+      )
+    end
+    if #up_to_date > 0 then
+      append_to_buffer(debug_buf, '  ' .. #up_to_date .. ' plugins up to date:')
+      for _, name in ipairs(up_to_date) do
+        append_to_buffer(debug_buf, '    • ' .. name)
+      end
+    end
+    if #errors > 0 then
+      append_to_buffer(debug_buf, '  Errors:')
+      for _, error in ipairs(errors) do
+        append_to_buffer(debug_buf, '    ' .. error)
+      end
+    end
+
+    -- Start sequential updates
+    if #plugins_to_update > 0 then
+      append_to_buffer(debug_buf, { '', 'Starting updates...' })
+      process_plugin_updates_sequential(plugins_to_update, debug_buf)
+    else
+      append_to_buffer(debug_buf, { '', 'All plugins are up to date!' })
+      print('All plugins are up to date!')
+    end
+  end)
+end
+
+-- Update enabled plugins using commit hash comparison
 function M.update(opts)
   opts = opts or {}
-  local force = opts.force or false
 
-  local enabled_names = M.get_enabled_plugin_names()
+  -- Collect enabled plugins
+  local enabled_plugins = {}
+  for _, spec in pairs(M.plugins) do
+    if spec.enabled then table.insert(enabled_plugins, spec) end
+  end
 
-  if #enabled_names == 0 then
+  if #enabled_plugins == 0 then
     print('No enabled plugins to update')
     return
   end
 
-  print('Updating plugins...')
+  print('Starting plugin update process...')
 
-  -- Create debug scratch buffer once
+  -- Create debug scratch buffer
   local buf = vim.api.nvim_create_buf(false, true)
   vim.api.nvim_buf_set_name(buf, 'Pack Update Debug')
   vim.api.nvim_open_win(buf, true, {
     split = 'right',
-    width = 50,
+    width = 60,
   })
   append_to_buffer(buf, {
     'Pack Update Debug Log',
     '=====================',
-    'Waiting for updates to be confirmed...',
+    'Checking ' .. #enabled_plugins .. ' plugins for updates...',
     '',
   })
 
-  -- Use vim.pack.update with the new API
-  vim.pack.update(enabled_names, { force = force })
-
-  -- Track PackChanged events and build
-  vim.g.need_build_packs = {}
-  local update_group = vim.api.nvim_create_augroup('simple-pack-update-' .. vim.fn.localtime(), { clear = true })
-
-  vim.api.nvim_create_autocmd('User', {
-    pattern = 'PackChanged',
-    group = update_group,
-    callback = function(event)
-      if event.data and event.data.kind == 'update' and event.data.spec then
-        local plugin_name = event.data.spec.name
-        append_to_buffer(buf, 'PackChanged event: ' .. plugin_name .. ' (updated)')
-
-        local spec = M.plugins[plugin_name]
-        if spec and spec.build then
-          table.insert(vim.g.need_build_packs, plugin_name)
-          append_to_buffer(buf, '- ' .. plugin_name .. ' needs to be built.')
-        end
-      end
-    end,
-  })
+  -- Start sequential processing
+  vim.schedule(function() process_plugins_updates(enabled_plugins, buf) end)
 end
 
 -- Remove disabled plugins using vim.pack.del()
@@ -503,25 +758,10 @@ vim.api.nvim_create_user_command('PackBuild', function(opts)
     local plugin_name = opts.args
     local spec = M.plugins[plugin_name]
     if spec and spec.build then
-      print('Building ' .. plugin_name .. '...')
       M.run_build(spec)
     else
       print('Plugin "' .. plugin_name .. '" not found or has no build command.')
     end
-  elseif vim.g.need_build_packs and #vim.g.need_build_packs > 0 then
-    -- Build all plugins from need_build_packs
-    print('Building plugins from need_build_packs...')
-    for _, plugin_name in ipairs(vim.g.need_build_packs) do
-      local spec = M.plugins[plugin_name]
-      if spec and spec.build then
-        print('Building ' .. plugin_name .. '...')
-        M.run_build(spec)
-      end
-    end
-    -- Clear the list after building
-    vim.g.need_build_packs = {}
-  else
-    print('No plugins to build. Use :PackBuild <plugin_name> or run :PackUpdate first.')
   end
 end, {
   nargs = '?',
