@@ -118,8 +118,24 @@ local function setup_popup_keymaps(win, bufnr, original_buf, close_popup, copy_c
     if vim.api.nvim_win_is_valid(win) then vim.api.nvim_set_current_win(win) end
   end, { buffer = original_buf, desc = 'Peek - Focus popup' })
 
+  -- Scroll keymaps for popup window
+  vim.keymap.set('n', '<C-f>', function()
+    if vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_call(win, function() vim.cmd('normal! \5') end) end
+  end, { buffer = original_buf })
+
+  vim.keymap.set('n', '<C-b>', function()
+    if vim.api.nvim_win_is_valid(win) then vim.api.nvim_win_call(win, function() vim.cmd('normal! \25') end) end
+  end, { buffer = original_buf })
+
   -- Copy callback if provided (for diagnostics)
-  if copy_callback then vim.keymap.set('n', 'y', copy_callback, { buffer = bufnr, desc = 'Copy content' }) end
+  if copy_callback then
+    vim.keymap.set('n', 'yp', copy_callback, {
+      buffer = original_buf,
+      noremap = true,
+      silent = true,
+      desc = 'Copy to clipboard',
+    })
+  end
 end
 
 -- Set up popup autocmds
@@ -262,8 +278,9 @@ local function create_diagnostics_copy_callback(diagnostic_data)
   end
 end
 
--- Set up diagnostics navigation keymaps
-local function setup_diagnostics_navigation(popup_win, bufnr, diagnostic_data, original_win)
+-- Generic navigation setup for popup items (diagnostics, symbols, etc.)
+local function setup_popup_navigation(popup_win, bufnr, item_data, original_win, get_position_fn, namespace_suffix)
+  namespace_suffix = namespace_suffix or 'popup_highlight'
   local current_highlighted_line = nil
   local original_bufnr = vim.api.nvim_win_get_buf(original_win)
 
@@ -272,20 +289,18 @@ local function setup_diagnostics_navigation(popup_win, bufnr, diagnostic_data, o
     callback = function()
       local cursor = vim.api.nvim_win_get_cursor(0)
       local line_idx = cursor[1]
-      if diagnostic_data[line_idx] and vim.api.nvim_win_is_valid(original_win) then
-        local diagnostic = diagnostic_data[line_idx]
-        local target_line = diagnostic.lnum + 1
+      if item_data[line_idx] and vim.api.nvim_win_is_valid(original_win) then
+        local item = item_data[line_idx]
+        local line, col = get_position_fn(item)
 
         -- Only update if we're highlighting a different line
-        if current_highlighted_line ~= target_line then
+        if current_highlighted_line ~= line then
           -- Clear previous highlight
-          if current_highlighted_line then clear_line_highlight(original_bufnr, 'diagnostic_highlight') end
+          if current_highlighted_line then clear_line_highlight(original_bufnr, namespace_suffix) end
 
-          -- Position diagnostic line with offset from top (5 lines or scrolloff)
+          -- Position line with offset from top (5 lines or scrolloff)
           local scrolloff = vim.api.nvim_get_option_value('scrolloff', { win = original_win })
           local offset = math.max(5, scrolloff)
-          local line = target_line
-          local col = diagnostic.col
           local topline = math.max(1, line - offset)
 
           vim.api.nvim_win_set_cursor(original_win, { line, col })
@@ -294,32 +309,112 @@ local function setup_diagnostics_navigation(popup_win, bufnr, diagnostic_data, o
             function() vim.fn.winrestview({ topline = topline, lnum = line, col = col }) end
           )
 
-          -- Apply permanent highlight to new diagnostic line
-          add_line_highlight(original_bufnr, target_line, 0, 'diagnostic_highlight')
-          current_highlighted_line = target_line
+          -- Apply permanent highlight to new line
+          add_line_highlight(original_bufnr, line, 0, namespace_suffix)
+          current_highlighted_line = line
         end
       end
     end,
   })
+
   vim.keymap.set('n', '<CR>', function()
-    if not diagnostic_data then
-      print('No diagnostic data available')
+    if not item_data then
+      print('No data available')
       return
     end
 
     local cursor = vim.api.nvim_win_get_cursor(popup_win)
     local line_idx = cursor[1]
-    if diagnostic_data[line_idx] then
-      local diagnostic = diagnostic_data[line_idx]
-      -- Clear diagnostic highlight before closing
-      clear_line_highlight(original_bufnr, 'diagnostic_highlight')
+    if item_data[line_idx] then
+      local item = item_data[line_idx]
+      local line, col = get_position_fn(item)
+      -- Clear highlight before closing
+      clear_line_highlight(original_bufnr, namespace_suffix)
       vim.api.nvim_win_close(popup_win, true)
       if vim.api.nvim_win_is_valid(original_win) then
         vim.api.nvim_set_current_win(original_win)
-        vim.api.nvim_win_set_cursor(original_win, { diagnostic.lnum + 1, diagnostic.col })
+        vim.api.nvim_win_set_cursor(original_win, { line, col })
       end
     end
-  end, { buffer = bufnr, desc = 'Jump to diagnostic' })
+  end, { buffer = bufnr, desc = 'Jump to item' })
+end
+
+-- Create symbols buffer with aligned formatting
+local function create_symbols_buffer(symbols)
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  local lines = {}
+  local symbol_data = {}
+
+  -- Calculate max line number width for alignment
+  local max_line_num = 0
+  for _, symbol in ipairs(symbols) do
+    local line_num = symbol.location.range.start.line + 1
+    if line_num > max_line_num then max_line_num = line_num end
+  end
+  local line_width = string.len(tostring(max_line_num))
+
+  for i, symbol in ipairs(symbols) do
+    local kind_name = vim.lsp.protocol.SymbolKind[symbol.kind] or 'Unknown'
+    local line_num = symbol.location.range.start.line + 1
+
+    -- Right-align line numbers for better visual alignment
+    local line_text = string.format('[%' .. line_width .. 'd] %s %s', line_num, kind_name, symbol.name)
+    if symbol.containerName then line_text = line_text .. ' (' .. symbol.containerName .. ')' end
+
+    table.insert(lines, line_text)
+    -- Transform symbol to look like diagnostic for reuse
+    symbol_data[i] = {
+      lnum = symbol.location.range.start.line,
+      col = symbol.location.range.start.character,
+      message = line_text,
+      original_symbol = symbol,
+    }
+  end
+
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+  vim.api.nvim_set_option_value('modifiable', false, { buf = bufnr })
+
+  return bufnr, nil, symbol_data
+end
+
+-- Create bottom-right popup window (DRY for diagnostics and symbols)
+local function create_bottom_right_popup(bufnr, title, original_win, width_factor)
+  width_factor = width_factor or 0.4
+
+  local win_height = vim.api.nvim_win_get_height(original_win)
+  local win_width = vim.api.nvim_win_get_width(original_win)
+
+  local popup_width = math.min(80, math.floor(win_width * width_factor))
+  local popup_height = math.min(15, math.floor(win_height * 0.3))
+
+  return create_popup_window(bufnr, title, {
+    relative = 'win',
+    win = original_win,
+    width = popup_width,
+    height = popup_height,
+    row = win_height - popup_height - 2,
+    col = win_width - popup_width - 1,
+  })
+end
+
+-- Common popup setup with navigation (DRY for diagnostics and symbols)
+local function setup_peek_popup(popup_bufnr, popup_win, original_win, item_data, namespace_suffix, copy_callback)
+  local ns_id = vim.api.nvim_create_namespace('peek_' .. namespace_suffix)
+
+  -- Create close function with highlight cleanup
+  local close_with_cleanup = function()
+    clear_line_highlight(vim.api.nvim_win_get_buf(original_win), namespace_suffix)
+    local close_popup = create_close_function(popup_win, popup_bufnr, ns_id)
+    close_popup()
+  end
+
+  -- Setup popup management
+  setup_popup_keymaps(popup_win, popup_bufnr, vim.api.nvim_get_current_buf(), close_with_cleanup, copy_callback)
+  setup_popup_autocmds(popup_win, vim.api.nvim_get_current_buf(), original_win, close_with_cleanup)
+
+  -- Setup navigation with highlighting
+  local get_position = function(item) return item.lnum + 1, item.col end
+  setup_popup_navigation(popup_win, popup_bufnr, item_data, original_win, get_position, namespace_suffix)
 end
 
 function M.peek_diagnostics()
@@ -333,36 +428,89 @@ function M.peek_diagnostics()
   local current_file = vim.fn.expand('%:t')
   local title = ' Diagnostics @' .. current_file .. ' '
 
-  -- Position popup at bottom-right corner, fixed position
-  local win_height = vim.api.nvim_win_get_height(original_win)
-  local win_width = vim.api.nvim_win_get_width(original_win)
-
-  local popup_width = math.min(80, math.floor(win_width * 0.7))
-  local popup_height = math.min(15, math.floor(win_height * 0.3))
-
-  local win = create_popup_window(diagnostics_bufnr, title, {
-    relative = 'win',
-    win = original_win,
-    width = popup_width,
-    height = popup_height,
-    row = win_height - popup_height - 2,
-    col = win_width - popup_width - 1,
-  })
-
+  local win = create_bottom_right_popup(diagnostics_bufnr, title, original_win, 0.7)
   local copy_callback = create_diagnostics_copy_callback(diagnostic_data)
-  local ns_id = vim.api.nvim_create_namespace('peek_diagnostics')
 
-  -- Create custom close function that clears diagnostic highlights
-  local close_with_cleanup = function()
-    clear_line_highlight(vim.api.nvim_win_get_buf(original_win), 'diagnostic_highlight')
-    local close_popup = create_close_function(win, diagnostics_bufnr, ns_id)
-    close_popup()
+  setup_peek_popup(diagnostics_bufnr, win, original_win, diagnostic_data, 'diagnostic_highlight', copy_callback)
+end
+
+-- Reuse existing diagnostics popup infrastructure for symbols
+function M.peek_symbols(symbol_kinds)
+  symbol_kinds = symbol_kinds or {} -- Default to all symbols
+
+  local clients = vim.lsp.get_clients({ bufnr = 0 })
+  if #clients == 0 then
+    print('No LSP client attached')
+    return
   end
 
-  -- Use custom popup management with cleanup
-  setup_popup_keymaps(win, diagnostics_bufnr, vim.api.nvim_get_current_buf(), close_with_cleanup, copy_callback)
-  setup_popup_autocmds(win, vim.api.nvim_get_current_buf(), original_win, close_with_cleanup)
-  setup_diagnostics_navigation(win, diagnostics_bufnr, diagnostic_data, original_win)
+  local params = { textDocument = vim.lsp.util.make_text_document_params(0) }
+
+  vim.lsp.buf_request(0, 'textDocument/documentSymbol', params, function(err, result)
+    if err or not result or vim.tbl_isempty(result) then
+      print('No symbols found')
+      return
+    end
+
+    -- Create symbol kind lookup for filtering
+    local symbol_kind_map = {}
+    if type(symbol_kinds) == 'string' then symbol_kinds = { symbol_kinds } end
+
+    if #symbol_kinds > 0 then
+      for _, kind_name in ipairs(symbol_kinds) do
+        for kind_num, lsp_kind_name in pairs(vim.lsp.protocol.SymbolKind) do
+          if lsp_kind_name == kind_name then
+            symbol_kind_map[kind_num] = true
+            break
+          end
+        end
+      end
+    end
+
+    -- Flatten and filter symbols
+    local function flatten_symbols(symbols, container_name)
+      local flattened = {}
+      for _, symbol in ipairs(symbols) do
+        -- Filter by kind if specified
+        if #symbol_kinds == 0 or symbol_kind_map[symbol.kind] then
+          local flat_symbol = {
+            name = symbol.name,
+            kind = symbol.kind,
+            containerName = container_name,
+            location = symbol.location or { range = symbol.range or symbol.selectionRange },
+          }
+          table.insert(flattened, flat_symbol)
+        end
+
+        -- Recursively flatten children
+        if symbol.children then
+          local children = flatten_symbols(symbol.children, symbol.name)
+          for _, child in ipairs(children) do
+            table.insert(flattened, child)
+          end
+        end
+      end
+      return flattened
+    end
+
+    local symbols = flatten_symbols(result)
+    if #symbols == 0 then
+      local filter_text = #symbol_kinds > 0 and table.concat(symbol_kinds, '/') or 'symbols'
+      print('No ' .. filter_text .. ' found')
+      return
+    end
+
+    local symbols_bufnr, _, symbol_data = create_symbols_buffer(symbols)
+
+    local original_win = vim.api.nvim_get_current_win()
+    local current_file = vim.fn.expand('%:t')
+    local filter_text = #symbol_kinds > 0 and table.concat(symbol_kinds, '/') or 'Symbols'
+    local title = ' ' .. filter_text .. ' @' .. current_file .. ' '
+
+    local win = create_bottom_right_popup(symbols_bufnr, title, original_win, 0.7)
+
+    setup_peek_popup(symbols_bufnr, win, original_win, symbol_data, 'symbol_highlight', nil)
+  end)
 end
 
 function M.peek_definition() peek_lsp_result('textDocument/definition', 'Definition', 'No definition found') end
