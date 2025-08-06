@@ -358,7 +358,7 @@ local function create_symbols_buffer(symbols)
     local line_num = symbol.location.range.start.line + 1
 
     -- Right-align line numbers for better visual alignment
-    local line_text = string.format('[%' .. line_width .. 'd] %s %s', line_num, kind_name, symbol.name)
+    local line_text = string.format('%' .. line_width .. 'd: %s %s', line_num, kind_name, symbol.name)
     if symbol.containerName then line_text = line_text .. ' (' .. symbol.containerName .. ')' end
 
     table.insert(lines, line_text)
@@ -378,14 +378,15 @@ local function create_symbols_buffer(symbols)
 end
 
 -- Create bottom-right popup window (DRY for diagnostics and symbols)
-local function create_bottom_right_popup(bufnr, title, original_win, width_factor)
+local function create_bottom_right_popup(bufnr, title, original_win, width_factor, height_factor)
   width_factor = width_factor or 0.4
+  height_factor = height_factor or 0.3
 
   local win_height = vim.api.nvim_win_get_height(original_win)
   local win_width = vim.api.nvim_win_get_width(original_win)
 
   local popup_width = math.min(80, math.floor(win_width * width_factor))
-  local popup_height = math.min(15, math.floor(win_height * 0.3))
+  local popup_height = math.min(20, math.floor(win_height * height_factor))
 
   return create_popup_window(bufnr, title, {
     relative = 'win',
@@ -507,7 +508,7 @@ function M.peek_symbols(symbol_kinds)
     local filter_text = #symbol_kinds > 0 and table.concat(symbol_kinds, '/') or 'Symbols'
     local title = ' ' .. filter_text .. ' @' .. current_file .. ' '
 
-    local win = create_bottom_right_popup(symbols_bufnr, title, original_win, 0.7)
+    local win = create_bottom_right_popup(symbols_bufnr, title, original_win, 0.35, 0.8)
 
     setup_peek_popup(symbols_bufnr, win, original_win, symbol_data, 'symbol_highlight', nil)
   end)
