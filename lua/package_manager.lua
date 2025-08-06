@@ -3,6 +3,26 @@ local M = {}
 
 M.plugins = {}
 M.loaded_plugins = {}
+M.installed_plugins = {}
+
+-- Lazy initialize installed plugins tracking only when needed
+local installed_plugins_initialized = false
+local function ensure_installed_plugins_initialized()
+  if not installed_plugins_initialized then
+    local pack_list = vim.pack.get()
+    for _, info in ipairs(pack_list) do
+      M.installed_plugins[info.spec.name] = true
+    end
+    installed_plugins_initialized = true
+  end
+end
+
+-- Request to immediately load a plugins
+_G.load_request = function(modname)
+  if M.loaded_plugins[modname] then return end
+  local spec = M.plugins[modname]
+  M.load_plugin(spec)
+end
 
 ---@class PluginSpec
 ---@field src string GitHub shortcut (user/plugin) or full URL
@@ -14,6 +34,7 @@ M.loaded_plugins = {}
 ---@field ft? string|string[] Filetype or table of filetypes for lazy loading
 ---@field keys? string|string[]|table[] Key mapping(s) for lazy loading (string, array, or LazyVim format)
 ---@field cmd? string|string[] Command name or table of commands for lazy loading
+---@field init? function Initialization function (runs immediately during startup)
 ---@field config? function Setup function (runs only once after loading)
 ---@field dependencies? string|string[] Dependency plugin source(s)
 ---@field lazy? boolean Default true, set false to load immediately
@@ -25,6 +46,9 @@ function M.add(spec)
 
   -- Only setup if enabled
   if not spec.enabled then return end
+
+  -- Run init function immediately during startup (like LazyNvim)
+  if spec.init then spec.init() end
 
   -- If not lazy, load immediately
   if spec.lazy == false then
@@ -103,16 +127,11 @@ function M.load_plugin(spec)
   -- Load dependencies first
   if spec.dependencies then M.load_dependencies(spec.dependencies) end
 
-  -- Check if plugin is already installed before adding
-  local pack_list = vim.pack.get()
-  local already_installed = false
-  for _, info in ipairs(pack_list) do
-    if info.spec.name == spec.name then
-      already_installed = true
-      break
-    end
-  end
+  -- Ensure plugin installation cache is initialized (one-time expensive vim.pack.get() call)
+  ensure_installed_plugins_initialized()
 
+  -- Check if plugin is already installed before adding
+  local already_installed = M.installed_plugins[spec.name] or false
   local pack_spec = {
     src = spec.src,
     name = spec.name,
@@ -123,6 +142,8 @@ function M.load_plugin(spec)
   if not already_installed and spec.build then
     -- Add without loading to prevent plugin files from executing before build
     vim.pack.add({ pack_spec }, { load = false })
+    M.installed_plugins[spec.name] = true
+
     print('Building ' .. spec.name .. '...')
     local build_success = M.run_build(spec)
     if build_success then
@@ -135,6 +156,7 @@ function M.load_plugin(spec)
   else
     -- Normal add (plugin already built or no build needed)
     vim.pack.add({ pack_spec })
+    M.installed_plugins[spec.name] = true
   end
 
   -- Mark as loaded first to prevent recursion
