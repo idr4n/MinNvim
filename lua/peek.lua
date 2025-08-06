@@ -74,7 +74,7 @@ local function add_line_highlight(bufnr, line, duration, namespace_suffix)
   vim.api.nvim_buf_set_extmark(bufnr, ns_id, line - 1, 0, {
     end_row = line - 1,
     end_col = line_length > 0 and line_length or 1,
-    hl_group = 'IncSearch',
+    hl_group = 'Visual',
     priority = 200,
   })
 
@@ -96,11 +96,12 @@ local function clear_line_highlight(bufnr, namespace_suffix)
   end
 end
 
--- Create popup close function
-local function create_close_function(win, bufnr, ns_id)
+-- Create popup close function with optional cleanup
+local function create_close_function(win, bufnr, ns_id, cleanup_fn)
   return function()
+    if cleanup_fn then cleanup_fn() end
     if vim.api.nvim_win_is_valid(win) then
-      if vim.api.nvim_buf_is_valid(bufnr) then vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1) end
+      if ns_id and vim.api.nvim_buf_is_valid(bufnr) then vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1) end
       vim.api.nvim_win_close(win, true)
     end
   end
@@ -173,16 +174,6 @@ local function setup_popup_autocmds(win, original_buf, original_win, close_popup
   })
 end
 
--- Set up popup window keymaps and autocmds
-local function setup_popup_management(win, bufnr, ns_id, copy_callback)
-  local original_buf = vim.api.nvim_get_current_buf()
-  local original_win = vim.api.nvim_get_current_win()
-
-  local close_popup = create_close_function(win, bufnr, ns_id)
-  setup_popup_keymaps(win, bufnr, original_buf, close_popup, copy_callback)
-  setup_popup_autocmds(win, original_buf, original_win, close_popup)
-end
-
 -- Generic peek function that works with any LSP method
 local function peek_lsp_result(lsp_method, title_prefix, no_result_msg)
   local clients = vim.lsp.get_clients({ bufnr = 0 })
@@ -220,8 +211,24 @@ local function peek_lsp_result(lsp_method, title_prefix, no_result_msg)
     vim.api.nvim_win_call(win, function() vim.fn.winrestview({ topline = line, lnum = line, col = col }) end)
 
     local ns_id = add_line_highlight(bufnr, line, 2000, 'definition_highlight')
-    setup_popup_management(win, bufnr, ns_id)
+
+    local original_buf = vim.api.nvim_get_current_buf()
+    local original_win = vim.api.nvim_get_current_win()
+    local close_popup = create_close_function(win, bufnr, ns_id)
+    setup_popup_keymaps(win, bufnr, original_buf, close_popup, nil)
+    setup_popup_autocmds(win, original_buf, original_win, close_popup)
   end)
+end
+
+-- Create a basic popup buffer with common settings
+local function create_popup_buffer(initial_lines)
+  local bufnr = vim.api.nvim_create_buf(false, true)
+  if initial_lines then vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, initial_lines) end
+  vim.api.nvim_set_option_value('buftype', 'nofile', { buf = bufnr })
+  vim.api.nvim_set_option_value('bufhidden', 'wipe', { buf = bufnr })
+  vim.api.nvim_set_option_value('swapfile', false, { buf = bufnr })
+  vim.api.nvim_set_option_value('modified', false, { buf = bufnr })
+  return bufnr
 end
 
 -- Create diagnostics popup buffer with formatted content
@@ -229,7 +236,7 @@ local function create_diagnostics_buffer()
   local diagnostics = vim.diagnostic.get(0)
   if #diagnostics == 0 then return nil, 'No diagnostics found' end
 
-  local bufnr = vim.api.nvim_create_buf(false, true)
+  local bufnr = create_popup_buffer()
   local lines = {}
   local diagnostic_data = {}
 
@@ -275,6 +282,32 @@ local function create_diagnostics_copy_callback(diagnostic_data)
     local content = table.concat(all_diagnostics, '\n')
     vim.fn.setreg('+', content)
     print('Diagnostics copied to clipboard')
+  end
+end
+
+-- Add custom selection highlighting to popup buffer
+local function add_selection_highlight(bufnr, line, namespace_suffix)
+  namespace_suffix = namespace_suffix or 'selection_highlight'
+  local ns_id = vim.api.nvim_create_namespace('peek_' .. namespace_suffix)
+
+  -- Get line content to determine proper end_col
+  local line_content = vim.api.nvim_buf_get_lines(bufnr, line - 1, line, false)[1] or ''
+  local end_col = #line_content
+
+  vim.api.nvim_buf_set_extmark(bufnr, ns_id, line - 1, 0, {
+    end_row = line - 1,
+    end_col = end_col,
+    hl_group = 'Visual',
+    priority = 100,
+  })
+
+  return ns_id
+end
+-- Clear selection highlighting from popup buffer
+local function clear_selection_highlight(bufnr, namespace_suffix)
+  if vim.api.nvim_buf_is_valid(bufnr) then
+    local ns_id = vim.api.nvim_create_namespace('peek_' .. namespace_suffix)
+    vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
   end
 end
 
@@ -341,7 +374,7 @@ end
 
 -- Create symbols buffer with aligned formatting
 local function create_symbols_buffer(symbols)
-  local bufnr = vim.api.nvim_create_buf(false, true)
+  local bufnr = create_popup_buffer()
   local lines = {}
   local symbol_data = {}
 
@@ -375,6 +408,84 @@ local function create_symbols_buffer(symbols)
   vim.api.nvim_set_option_value('modifiable', false, { buf = bufnr })
 
   return bufnr, nil, symbol_data
+end
+
+-- Create search input buffer
+local function create_search_input_buffer()
+  local bufnr = create_popup_buffer({ '' })
+
+  -- Disable completion and other intrusive features
+  vim.api.nvim_set_option_value('completefunc', '', { buf = bufnr })
+  vim.api.nvim_set_option_value('omnifunc', '', { buf = bufnr })
+  vim.api.nvim_set_option_value('complete', '', { buf = bufnr })
+  vim.api.nvim_set_option_value('completeopt', '', { buf = bufnr })
+
+  --  Disable completions
+  vim.api.nvim_create_autocmd('BufEnter', {
+    buffer = bufnr,
+    callback = function() vim.b.completion = false end,
+  })
+
+  return bufnr
+end -- Filter symbols based on search query
+local function filter_symbols(symbols, query)
+  if not query or query == '' then return symbols end
+
+  local filtered = {}
+  local lower_query = string.lower(query)
+
+  for _, symbol in ipairs(symbols) do
+    local symbol_text = string.lower(symbol.name)
+    if symbol.containerName then symbol_text = symbol_text .. ' ' .. string.lower(symbol.containerName) end
+
+    if string.find(symbol_text, lower_query, 1, true) then table.insert(filtered, symbol) end
+  end
+
+  return filtered
+end
+
+-- Update symbols buffer with filtered results
+local function update_symbols_buffer(bufnr, symbols, symbol_data_ref)
+  local lines = {}
+  local symbol_data = {}
+
+  -- Calculate max line number width for alignment
+  local max_line_num = 0
+  for _, symbol in ipairs(symbols) do
+    local line_num = symbol.location.range.start.line + 1
+    if line_num > max_line_num then max_line_num = line_num end
+  end
+  local line_width = string.len(tostring(max_line_num))
+
+  for i, symbol in ipairs(symbols) do
+    local kind_name = vim.lsp.protocol.SymbolKind[symbol.kind] or 'Unknown'
+    local line_num = symbol.location.range.start.line + 1
+
+    -- Right-align line numbers for better visual alignment
+    local line_text = string.format('%' .. line_width .. 'd: %s %s', line_num, kind_name, symbol.name)
+    if symbol.containerName then line_text = line_text .. ' (' .. symbol.containerName .. ')' end
+
+    table.insert(lines, line_text)
+    -- Transform symbol to look like diagnostic for reuse
+    symbol_data[i] = {
+      lnum = symbol.location.range.start.line,
+      col = symbol.location.range.start.character,
+      message = line_text,
+      original_symbol = symbol,
+    }
+  end
+
+  vim.api.nvim_set_option_value('modifiable', true, { buf = bufnr })
+  vim.api.nvim_buf_set_lines(bufnr, 0, -1, false, lines)
+  vim.api.nvim_set_option_value('modifiable', false, { buf = bufnr })
+
+  -- Update the reference to symbol_data
+  for k in pairs(symbol_data_ref) do
+    symbol_data_ref[k] = nil
+  end
+  for k, v in pairs(symbol_data) do
+    symbol_data_ref[k] = v
+  end
 end
 
 -- Create bottom-right popup window (DRY for diagnostics and symbols)
@@ -418,6 +529,45 @@ local function setup_peek_popup(popup_bufnr, popup_win, original_win, item_data,
   setup_popup_navigation(popup_win, popup_bufnr, item_data, original_win, get_position, namespace_suffix)
 end
 
+-- Setup for multi-window popup (search + symbols)
+local function setup_multi_popup_autocmds(search_win, symbols_win, original_buf, original_win, close_all_popups)
+  -- Only close if we move cursor in the original buffer/window
+  local close_autocmd = vim.api.nvim_create_autocmd({ 'CursorMoved', 'CursorMovedI' }, {
+    buffer = original_buf,
+    callback = function()
+      local current_buf = vim.api.nvim_get_current_buf()
+      local current_win = vim.api.nvim_get_current_win()
+
+      if current_buf == original_buf and current_win == original_win then
+        close_all_popups()
+        return true
+      end
+    end,
+  })
+
+  -- Close if we leave the original buffer to go somewhere else (not our popups)
+  vim.api.nvim_create_autocmd('BufLeave', {
+    buffer = original_buf,
+    once = true,
+    callback = function()
+      vim.defer_fn(function()
+        local current_win = vim.api.nvim_get_current_win()
+        if current_win ~= search_win and current_win ~= symbols_win then close_all_popups() end
+      end, 50)
+    end,
+  })
+
+  -- Clean up autocmd when windows are closed
+  vim.api.nvim_create_autocmd('WinClosed', {
+    pattern = { tostring(search_win), tostring(symbols_win) },
+    callback = function()
+      if close_autocmd and vim.api.nvim_get_autocmds({ id = close_autocmd })[1] then
+        pcall(vim.api.nvim_del_autocmd, close_autocmd)
+      end
+    end,
+  })
+end
+
 function M.peek_diagnostics()
   local diagnostics_bufnr, err, diagnostic_data = create_diagnostics_buffer()
   if not diagnostics_bufnr then
@@ -435,7 +585,227 @@ function M.peek_diagnostics()
   setup_peek_popup(diagnostics_bufnr, win, original_win, diagnostic_data, 'diagnostic_highlight', copy_callback)
 end
 
--- Reuse existing diagnostics popup infrastructure for symbols
+-- Create symbol kind lookup for filtering
+local function create_symbol_kind_map(symbol_kinds)
+  local symbol_kind_map = {}
+  if type(symbol_kinds) == 'string' then symbol_kinds = { symbol_kinds } end
+
+  if #symbol_kinds > 0 then
+    for _, kind_name in ipairs(symbol_kinds) do
+      for kind_num, lsp_kind_name in pairs(vim.lsp.protocol.SymbolKind) do
+        if lsp_kind_name == kind_name then
+          symbol_kind_map[kind_num] = true
+          break
+        end
+      end
+    end
+  end
+
+  return symbol_kind_map, symbol_kinds
+end
+
+-- Flatten and filter symbols recursively
+local function flatten_symbols(symbols, container_name, symbol_kind_map, symbol_kinds)
+  local flattened = {}
+  for _, symbol in ipairs(symbols) do
+    -- Filter by kind if specified
+    if #symbol_kinds == 0 or symbol_kind_map[symbol.kind] then
+      local flat_symbol = {
+        name = symbol.name,
+        kind = symbol.kind,
+        containerName = container_name,
+        location = symbol.location or { range = symbol.range or symbol.selectionRange },
+      }
+      table.insert(flattened, flat_symbol)
+    end
+
+    -- Recursively flatten children
+    if symbol.children then
+      local children = flatten_symbols(symbol.children, symbol.name, symbol_kind_map, symbol_kinds)
+      for _, child in ipairs(children) do
+        table.insert(flattened, child)
+      end
+    end
+  end
+  return flattened
+end
+
+-- Create and setup search functionality for symbols
+local function setup_symbols_search(symbols_bufnr, symbols_win, all_symbols, symbol_data, original_win)
+  local current_selection = 0 -- Start with no selection
+  local current_highlighted_line = nil
+  local current_popup_highlight = nil
+  local original_bufnr = vim.api.nvim_win_get_buf(original_win)
+
+  -- Update preview based on current selection
+  local function update_preview_selection()
+    if current_selection > 0 and symbol_data[current_selection] and vim.api.nvim_win_is_valid(original_win) then
+      local item = symbol_data[current_selection]
+      local line, col = item.lnum + 1, item.col
+
+      -- Clear previous highlights
+      if current_highlighted_line then clear_line_highlight(original_bufnr, 'symbol_highlight') end
+      if current_popup_highlight then clear_selection_highlight(symbols_bufnr, 'symbol_selection') end
+
+      -- Position line with offset from top
+      local scrolloff = vim.api.nvim_get_option_value('scrolloff', { win = original_win })
+      local offset = math.max(5, scrolloff)
+      local topline = math.max(1, line - offset)
+
+      vim.api.nvim_win_set_cursor(original_win, { line, col })
+      vim.api.nvim_win_call(
+        original_win,
+        function() vim.fn.winrestview({ topline = topline, lnum = line, col = col }) end
+      )
+
+      -- Apply permanent highlight to new line
+      add_line_highlight(original_bufnr, line, 0, 'symbol_highlight')
+      current_highlighted_line = line
+
+      -- Add selection highlight to popup
+      current_popup_highlight = add_selection_highlight(symbols_bufnr, current_selection, 'symbol_selection')
+
+      -- Update symbols window cursor
+      if vim.api.nvim_win_is_valid(symbols_win) then
+        vim.api.nvim_win_set_cursor(symbols_win, { current_selection, 0 })
+      end
+    end
+  end
+
+  -- Set up search functionality with selection tracking
+  local function update_search_results(query)
+    local filtered_symbols = filter_symbols(all_symbols, query)
+    update_symbols_buffer(symbols_bufnr, filtered_symbols, symbol_data)
+
+    -- Only auto-select first item if user has typed something
+    if query and query ~= '' then
+      current_selection = 1
+      if vim.api.nvim_win_is_valid(symbols_win) then vim.api.nvim_win_set_cursor(symbols_win, { 1, 0 }) end
+      update_preview_selection()
+    else
+      -- Clear selection if query is empty
+      current_selection = 0
+      if current_highlighted_line then
+        clear_line_highlight(original_bufnr, 'symbol_highlight')
+        current_highlighted_line = nil
+      end
+      if current_popup_highlight then
+        clear_selection_highlight(symbols_bufnr, 'symbol_selection')
+        current_popup_highlight = nil
+      end
+    end
+  end
+
+  -- Navigate selection up/down
+  local function navigate_selection(direction)
+    local max_items = vim.tbl_count(symbol_data)
+    if max_items == 0 then return end
+
+    -- Initialize selection if not set
+    if current_selection == 0 then
+      current_selection = 1
+    else
+      if direction == 'down' then
+        current_selection = current_selection < max_items and current_selection + 1 or 1
+      else
+        current_selection = current_selection > 1 and current_selection - 1 or max_items
+      end
+    end
+
+    update_preview_selection()
+  end
+
+  return {
+    update_search_results = update_search_results,
+    navigate_selection = navigate_selection,
+    current_selection = function() return current_selection end,
+    current_highlighted_line = function() return current_highlighted_line end,
+    current_popup_highlight = function() return current_popup_highlight end,
+    original_bufnr = original_bufnr,
+  }
+end
+
+-- Setup keymaps and autocmds for symbols search
+local function setup_symbols_keymaps(
+  search_bufnr,
+  symbols_bufnr,
+  search_win,
+  symbols_win,
+  original_win,
+  cursor_pos,
+  search_state,
+  symbol_data
+)
+  local original_bufnr = search_state.original_bufnr
+
+  -- Set up search input keymaps and autocmds
+  vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI' }, {
+    buffer = search_bufnr,
+    callback = function()
+      local query = vim.api.nvim_buf_get_lines(search_bufnr, 0, 1, false)[1] or ''
+      search_state.update_search_results(query)
+    end,
+  })
+  -- Enhanced keymaps for search window - navigate without leaving search box
+  vim.keymap.set(
+    { 'n', 'i' },
+    '<C-j>',
+    function() search_state.navigate_selection('down') end,
+    { buffer = search_bufnr, desc = 'Next symbol' }
+  )
+
+  vim.keymap.set(
+    { 'n', 'i' },
+    '<C-k>',
+    function() search_state.navigate_selection('up') end,
+    { buffer = search_bufnr, desc = 'Previous symbol' }
+  )
+
+  -- Enter to jump to selected symbol
+  vim.keymap.set({ 'n', 'i' }, '<CR>', function()
+    local current_selection = search_state.current_selection()
+    if current_selection > 0 and symbol_data[current_selection] then
+      local item = symbol_data[current_selection]
+      local line, col = item.lnum + 1, item.col
+      -- Clear all highlights before closing
+      if search_state.current_highlighted_line() then clear_line_highlight(original_bufnr, 'symbol_highlight') end
+      if search_state.current_popup_highlight() then clear_selection_highlight(symbols_bufnr, 'symbol_selection') end
+      -- Close windows
+      if vim.api.nvim_win_is_valid(search_win) then vim.api.nvim_win_close(search_win, true) end
+      if vim.api.nvim_win_is_valid(symbols_win) then vim.api.nvim_win_close(symbols_win, true) end
+      if vim.api.nvim_win_is_valid(original_win) then
+        vim.api.nvim_set_current_win(original_win)
+        vim.api.nvim_win_set_cursor(original_win, { line, col })
+        vim.schedule(function() vim.cmd('stopinsert') end)
+      end
+    end
+  end, { buffer = search_bufnr, desc = 'Jump to symbol' })
+
+  -- Create close function for both popups with proper cleanup
+  local close_all_popups = function()
+    -- Clear all highlights
+    if search_state.current_highlighted_line() then clear_line_highlight(original_bufnr, 'symbol_highlight') end
+    if search_state.current_popup_highlight() then clear_selection_highlight(symbols_bufnr, 'symbol_selection') end
+    -- Close windows
+    if vim.api.nvim_win_is_valid(search_win) then vim.api.nvim_win_close(search_win, true) end
+    if vim.api.nvim_win_is_valid(symbols_win) then vim.api.nvim_win_close(symbols_win, true) end
+    -- Ensure we're in normal mode when returning to original buffer
+    vim.schedule(function()
+      local line, col = unpack(cursor_pos)
+      pcall(vim.api.nvim_win_set_cursor, 0, { line, col + 1 })
+      vim.cmd('stopinsert')
+    end)
+  end
+
+  -- Set up Esc keymaps for both buffers
+  for _, buf in ipairs({ search_bufnr, symbols_bufnr }) do
+    vim.keymap.set({ 'n', 'i' }, '<Esc>', close_all_popups, { buffer = buf, desc = 'Close search' })
+  end
+
+  return close_all_popups
+end
+
+-- Enhanced symbols popup with search functionality
 function M.peek_symbols(symbol_kinds)
   symbol_kinds = symbol_kinds or {} -- Default to all symbols
 
@@ -453,64 +823,78 @@ function M.peek_symbols(symbol_kinds)
       return
     end
 
-    -- Create symbol kind lookup for filtering
-    local symbol_kind_map = {}
-    if type(symbol_kinds) == 'string' then symbol_kinds = { symbol_kinds } end
+    -- Create symbol kind lookup and flatten symbols
+    local symbol_kind_map, processed_symbol_kinds = create_symbol_kind_map(symbol_kinds)
+    local all_symbols = flatten_symbols(result, nil, symbol_kind_map, processed_symbol_kinds)
 
-    if #symbol_kinds > 0 then
-      for _, kind_name in ipairs(symbol_kinds) do
-        for kind_num, lsp_kind_name in pairs(vim.lsp.protocol.SymbolKind) do
-          if lsp_kind_name == kind_name then
-            symbol_kind_map[kind_num] = true
-            break
-          end
-        end
-      end
-    end
-
-    -- Flatten and filter symbols
-    local function flatten_symbols(symbols, container_name)
-      local flattened = {}
-      for _, symbol in ipairs(symbols) do
-        -- Filter by kind if specified
-        if #symbol_kinds == 0 or symbol_kind_map[symbol.kind] then
-          local flat_symbol = {
-            name = symbol.name,
-            kind = symbol.kind,
-            containerName = container_name,
-            location = symbol.location or { range = symbol.range or symbol.selectionRange },
-          }
-          table.insert(flattened, flat_symbol)
-        end
-
-        -- Recursively flatten children
-        if symbol.children then
-          local children = flatten_symbols(symbol.children, symbol.name)
-          for _, child in ipairs(children) do
-            table.insert(flattened, child)
-          end
-        end
-      end
-      return flattened
-    end
-
-    local symbols = flatten_symbols(result)
-    if #symbols == 0 then
-      local filter_text = #symbol_kinds > 0 and table.concat(symbol_kinds, '/') or 'symbols'
+    if #all_symbols == 0 then
+      local filter_text = #processed_symbol_kinds > 0 and table.concat(processed_symbol_kinds, '/') or 'symbols'
       print('No ' .. filter_text .. ' found')
       return
     end
 
-    local symbols_bufnr, _, symbol_data = create_symbols_buffer(symbols)
-
+    -- Setup UI components
     local original_win = vim.api.nvim_get_current_win()
     local current_file = vim.fn.expand('%:t')
-    local filter_text = #symbol_kinds > 0 and table.concat(symbol_kinds, '/') or 'Symbols'
-    local title = ' ' .. filter_text .. ' @' .. current_file .. ' '
+    local filter_text = #processed_symbol_kinds > 0 and table.concat(processed_symbol_kinds, '/') or 'Symbols'
 
-    local win = create_bottom_right_popup(symbols_bufnr, title, original_win, 0.35, 0.8)
+    -- Create search input buffer and window
+    local search_bufnr = create_search_input_buffer()
+    local search_title = ' Search ' .. filter_text .. ' '
 
-    setup_peek_popup(symbols_bufnr, win, original_win, symbol_data, 'symbol_highlight', nil)
+    -- Create search window with fixed height of 1 line
+    local win_height = vim.api.nvim_win_get_height(original_win)
+    local win_width = vim.api.nvim_win_get_width(original_win)
+    local search_width = math.min(80, math.floor(win_width * 0.35))
+    local search_height = 1 -- Fixed height for single line input
+
+    local search_win = create_popup_window(search_bufnr, search_title, {
+      relative = 'win',
+      win = original_win,
+      width = search_width,
+      height = search_height,
+      row = win_height - search_height - 2,
+      col = win_width - search_width - 1,
+    })
+
+    -- Create symbols buffer and window
+    local symbols_bufnr, _, symbol_data = create_symbols_buffer(all_symbols)
+    local symbols_title = ' ' .. filter_text .. ' @' .. current_file .. ' '
+
+    local symbols_height = math.min(20, math.floor(win_height * 0.75))
+
+    local symbols_win = create_popup_window(symbols_bufnr, symbols_title, {
+      relative = 'win',
+      win = original_win,
+      width = search_width,
+      height = symbols_height,
+      row = win_height - symbols_height - search_height - 4, -- Leave space for search box + borders
+      col = win_width - search_width - 1,
+    })
+    -- Setup search functionality
+    local search_state = setup_symbols_search(symbols_bufnr, symbols_win, all_symbols, symbol_data, original_win)
+
+    local cursor = vim.api.nvim_win_get_cursor(0)
+    -- Setup keymaps and autocmds
+    local close_all_popups = setup_symbols_keymaps(
+      search_bufnr,
+      symbols_bufnr,
+      search_win,
+      symbols_win,
+      original_win,
+      cursor,
+      search_state,
+      symbol_data
+    )
+
+    -- Set up multi-popup autocmds (handles both windows)
+    local original_buf = vim.api.nvim_get_current_buf()
+    -- Save cursor position
+    setup_multi_popup_autocmds(search_win, symbols_win, original_buf, original_win, close_all_popups)
+
+    -- Focus search input initially
+    vim.api.nvim_set_current_win(search_win)
+    vim.cmd('startinsert!')
   end)
 end
 
