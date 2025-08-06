@@ -37,10 +37,6 @@ vim.opt.fillchars = {
   -- eob = " ",
 }
 
--- Disable treesitter
--- vim.treesitter.start = function() end
--- vim.api.nvim_create_autocmd("BufEnter", {callback = function() vim.treesitter.stop() end})
-
 -- Enable syntax and load colorscheme
 vim.cmd.colorscheme("minimal")
 
@@ -48,7 +44,7 @@ vim.cmd.colorscheme("minimal")
 vim.o.grepprg = "rg --vimgrep"
 vim.o.grepformat = "%f:%l:%c:%m"
 
--- Explorer settings
+-- Netrw settings
 vim.g.netrw_browse_split = 0
 vim.g.netrw_winsize = 25
 vim.g.netrw_fastbrowse = 0

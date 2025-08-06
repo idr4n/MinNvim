@@ -103,7 +103,7 @@ function M.fileinfo()
   local pretty_dir = '╼ ' .. dir
   local path = vim.fn.expand('%:t')
   local name = (path == '' and 'Empty ') or path:match('([^/\\]+)[/\\]*$')
-  local modified = hl_str('DiagnosticError', ' %m') or ''
+  local modified = vim.bo.modified and hl_str('DiagnosticError', ' •') or ''
   return ' ' .. (dir ~= '' and pretty_dir .. '  ' or '') .. name .. modified .. ' %r%h%w '
 end
 
@@ -170,9 +170,7 @@ function M.git_status_simple()
   local changed = ''
   local removed = ''
 
-  if gitsigns.add and gitsigns.add > 0 then
-    added = M.get_or_create_hl('MiniDiffSignAdd', 'StatusLine') .. diff_icon
-  end
+  if gitsigns.add and gitsigns.add > 0 then added = M.get_or_create_hl('MiniDiffSignAdd', 'StatusLine') .. diff_icon end
 
   if gitsigns.change and gitsigns.change > 0 then
     changed = M.get_or_create_hl('MiniDiffSignChange', 'StatusLine') .. diff_icon

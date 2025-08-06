@@ -225,14 +225,22 @@ function M.show_startup_screen(custom_message, show_loading)
   vim.g.startup_buffer_id = vim.api.nvim_get_current_buf()
 end
 
--- Restore UI settings when leaving startup screen
-function M.restore_ui_settings()
+-- function used to retrieve buffers (source: heirline's cookbook.md)
+local function get_bufs()
+  return vim.tbl_filter(
+    function(bufnr) return vim.api.nvim_get_option_value('buflisted', { buf = bufnr }) end,
+    vim.api.nvim_list_bufs()
+  )
+end
+
+--- function to close all other buffers but the current one
+---@param opts? {close_current:boolean} --default: { close_current = true }
+function M.close_all_bufs(opts)
+  opts = opts or { close_current = true }
+  local bufs = get_bufs()
   local current_buf = vim.api.nvim_get_current_buf()
-  if current_buf ~= vim.g.startup_buffer_id then
-    -- Restore preferred settings
-    vim.wo.signcolumn = 'yes:2'
-    vim.o.laststatus = 2 -- Show statusline always
-    vim.o.ruler = true -- Restore ruler
+  for _, i in ipairs(bufs) do
+    if i ~= current_buf or opts.close_current then vim.api.nvim_buf_delete(i, {}) end
   end
 end
 

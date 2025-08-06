@@ -17,7 +17,14 @@ vim.api.nvim_create_autocmd('VimEnter', {
 -- Restore normal settings when opening actual files
 aucmd({ 'BufRead', 'BufNewFile' }, {
   group = startup_group,
-  callback = function() require('utils').restore_ui_settings() end,
+  callback = function()
+    local current_buf = vim.api.nvim_get_current_buf()
+    if current_buf ~= vim.g.startup_buffer_id then
+      vim.wo.signcolumn = 'yes:2'
+      vim.o.laststatus = 2 -- Show statusline always
+      vim.o.ruler = true -- Restore ruler
+    end
+  end,
 })
 
 -- close some filetypes with <q>

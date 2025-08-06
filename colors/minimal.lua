@@ -6,6 +6,12 @@ end
 
 vim.g.colors_name = "minimal"
 
+local settings = {
+  comments = { italic = false },
+  functions = { bold = false },
+  keywords = { bold =false },
+}
+
 -- Color palette
 local colors = {
   bg = "#282828",
@@ -22,6 +28,7 @@ local colors = {
   blue = "#7CAEA3",
   green = "#A8B765",
   cyan = "#B3F6C0",
+  magenta = "#FF87D7",
   -- Diff colors
   diff_add = "#89b482",
   diff_delete = "#cc241d", -- red for deletions
@@ -39,13 +46,13 @@ hl("StatusLine", { fg = colors.statusline_fg, bg = colors.statusline_bg })
 hl("StatusLineNC", { fg = colors.statusline_nc, bg = colors.statusline_bg })
 
 -- Define the syntax groups we want colored differently
-hl("Comment", { fg = colors.comment })
+hl("Comment", { fg = colors.comment, italic = settings.comments.italic or false })
 hl("String", { fg = colors.string })
 hl("Number", { fg = colors.number })
 
 -- Reset all other syntax groups to Normal to prevent default color bleeding
-hl("Keyword", { fg = colors.fg })
-hl("Function", { fg = colors.fg, bold = true })
+hl("Keyword", { fg = colors.fg, bold = settings.keywords.bold or false })
+hl("Function", { fg = colors.fg, bold = settings.functions.bold or false })
 hl("Type", { fg = colors.fg })
 hl("Constant", { fg = colors.fg })
 hl("Boolean", { fg = colors.fg })
@@ -170,3 +177,11 @@ hl("DiagnosticUnderlineOk", { undercurl = true, sp = colors.cyan })
 -- hl("DiagnosticSignInfo", { fg = colors.fg })
 -- hl("DiagnosticSignHint", { fg = colors.fg })
 -- hl("DiagnosticSignOk", { fg = colors.fg })
+
+-- Plugins
+
+-- mini.pick
+hl('MiniPickNormal', { bg = colors.bg })
+hl('MiniPickBorder', { bg = colors.bg })
+hl('MiniPickBorder', { bg = colors.bg })
+hl('MiniPickMatchRanges', { fg = colors.magenta })

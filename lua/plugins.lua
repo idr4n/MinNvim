@@ -6,18 +6,53 @@ local p = manager.add
 --: Lazy load treesitter {{{
 p({
   src = 'nvim-treesitter/nvim-treesitter',
-  -- enabled = false,
   event = { 'BufReadPost', 'BufNewFile', 'BufWritePre' },
   config = function()
     vim.pack.add({ 'nvim-treesitter/nvim-treesitter' })
     require('nvim-treesitter.configs').setup({
-      ensure_installed = { 'lua', 'vim', 'vimdoc', 'query', 'go', 'markdown', 'markdown_inline' },
+      ensure_installed = { 'lua', 'vim', 'vimdoc', 'query', 'go', 'markdown', 'rust', 'python', 'markdown_inline' },
       highlight = { enable = true, additional_vim_regex_highlighting = false },
       indent = { enable = true },
     })
   end,
 })
 --: }}}
+
+--: Lazy load conform {{{
+p({
+  src = 'stevearc/conform.nvim',
+  event = { 'BufReadPost', 'BufNewFile', 'BufWritePre' },
+  keys = {
+    {
+      'n',
+      '<leader>cf',
+      function() require('conform').format({ async = true, lsp_fallback = true }) end,
+      { desc = 'Code format' },
+    },
+  },
+  config = function()
+    local opts = {
+      lsp_fallback = true,
+      formatters_by_ft = {
+        lua = { 'stylua' },
+        javascript = { 'prettier' },
+        typescript = { 'prettier' },
+        javascriptreact = { 'prettier' },
+        typescriptreact = { 'prettier' },
+        css = { 'prettier' },
+        html = { 'prettier' },
+        sh = { 'shfmt' },
+        go = { 'goimports', 'gofumpt' },
+      },
+      format_on_save = {
+        timeout_ms = 500,
+        lsp_format = 'fallback',
+      },
+    }
+    require('conform').setup(opts)
+  end,
+})
+--}}}
 
 --: Lazy load mini.diff {{{
 p({
@@ -144,12 +179,23 @@ p({
     })
   end,
   keys = {
-    { 'n', '<C-Space>', '<cmd>FzfLua files<cr>', { desc = 'FzfLua Files' } },
+    -- { 'n', '<C-Space>', '<cmd>FzfLua files<cr>', { desc = 'FzfLua Files' } },
+    -- { 'n', '<leader>sf', '<cmd>FzfLua files<cr>', { desc = 'FzfLua Files' } },
     { 'n', '<leader>sk', '<cmd>FzfLua keymaps<cr>', { desc = 'FzfLua Keymaps' } },
     { 'n', '<leader>r', '<cmd>FzfLua live_grep<cr>', { desc = 'FzfLua Live Grep' } },
-    { 'n', '<leader>gs', function ()
-      require("fzf-lua").git_status({ winopts = { preview = { hidden = false } } })
-    end, { desc = 'FzfLua Git Status' } },
+    { 'n', '<leader>or', '<cmd>FzfLua resume<cr>', { desc = 'FzfLua Resume' } },
+    {
+      'n',
+      '<leader>sl',
+      function() require('fzf-lua').highlights({ winopts = { preview = { hidden = false } } }) end,
+      { desc = 'FzfLua Highlights' },
+    },
+    {
+      'n',
+      '<leader>gs',
+      function() require('fzf-lua').git_status({ winopts = { preview = { hidden = false } } }) end,
+      { desc = 'FzfLua Git Status' },
+    },
   },
 })
 --: }}}
@@ -170,30 +216,6 @@ p({
 })
 --: }}}
 
---: Lazy load netrw-preview {{{
-p({
-  src = 'idr4n/netrw-preview.nvim',
-  config = function()
-    require('netrw-preview').setup({
-      preview_width = 65,
-      mappings = {
-        close_netrw = { 'q', 'gq', '<c-q>' },
-        toggle_preview = { 'p', '<Tab>' },
-        directory_mappings = {
-          { key = '~', path = '~', desc = 'Home directory' },
-          { key = 'gd', path = '~/Downloads', desc = 'Downloads directory' },
-          { key = 'gw', path = function() return vim.fn.getcwd() end, desc = 'Current working directory' },
-        },
-      },
-    })
-  end,
-  keys = {
-    { 'n', ',,', '<cmd>NetrwRevealToggle<cr>', { desc = 'Toggle Netrw - Reveal' } },
-    { 'n', ',l', '<cmd>NetrwRevealLexToggle<cr>', { desc = 'Toggle Netrw (Lex) - Reveal' } },
-  },
-})
---: }}}
-
 --: Lazy load blink-cmp {{{
 p({
   src = 'saghen/blink.cmp',
@@ -203,9 +225,9 @@ p({
   config = function()
     require('blink.cmp').setup({
       cmdline = {
-        enabled = false,
+        enabled = true,
         completion = {
-          menu = { auto_show = false },
+          menu = { auto_show = true },
           list = { selection = { preselect = false, auto_insert = true } },
         },
       },
@@ -253,7 +275,52 @@ p({
 })
 --: }}}
 
---: Lazy load zk-nvim {{{
+--: Lazy load fff.nvim {{{
+p({
+  src = 'dmtrKovalenko/fff.nvim',
+  event = 'VimEnter',
+  build = 'cargo build --release',
+  config = function()
+    require('fff').setup({
+      preview = { enabled = true },
+      -- debug = { show_scores = true, }, -- Toggle with F2 or :FFFDebug
+      icons = { enabled = false },
+      keymaps = {
+        move_up = { '<Up>', '<C-p>', '<C-k>' },
+        move_down = { '<Down>', '<C-n>', '<C-j>' },
+        close = { '<Esc>', '<C-c>' },
+        select = { '<CR>', '<C-l>' },
+      },
+    })
+  end,
+  keys = {
+    { 'n', '<C-Space>', function() require('fff').find_files() end, { desc = 'FFF Files' } },
+  },
+})
+--}}}
+
+--: Lazy load misc plugins {{{
+p({
+  src = 'idr4n/netrw-preview.nvim',
+  config = function()
+    require('netrw-preview').setup({
+      preview_width = 65,
+      mappings = {
+        close_netrw = { 'q', 'gq', '<c-q>' },
+        toggle_preview = { 'p', '<Tab>' },
+        directory_mappings = {
+          { key = '~', path = '~', desc = 'Home directory' },
+          { key = 'gd', path = '~/Downloads', desc = 'Downloads directory' },
+          { key = 'gw', path = function() return vim.fn.getcwd() end, desc = 'Current working directory' },
+        },
+      },
+    })
+  end,
+  keys = {
+    { 'n', ',,', '<cmd>NetrwRevealToggle<cr>', { desc = 'Toggle Netrw - Reveal' } },
+    { 'n', ',l', '<cmd>NetrwRevealLexToggle<cr>', { desc = 'Toggle Netrw (Lex) - Reveal' } },
+  },
+})
 p({
   src = 'zk-org/zk-nvim',
   dependencies = { 'ibhagwan/fzf-lua' },
@@ -305,4 +372,38 @@ p({
     })
   end,
 })
---: }}}
+p({
+  src = 'nvim-treesitter/nvim-treesitter-textobjects',
+  event = 'LspAttach',
+  config = function()
+    local opts = {
+      textobjects = {
+        select = {
+          enable = true,
+          lookahead = true,
+          keymaps = {
+            ['af'] = '@function.outer',
+            ['if'] = '@function.inner',
+            ['ac'] = '@conditional.outer',
+            ['ic'] = '@conditional.inner',
+            ['al'] = '@loop.outer',
+            ['il'] = '@loop.inner',
+          },
+        },
+        lsp_interop = {
+          enable = true,
+          border = 'rounded',
+          peek_definition_code = {
+            ['<leader>dp'] = '@function.outer',
+          },
+        },
+      },
+    }
+    require('nvim-treesitter.configs').setup(opts)
+  end,
+})
+p({
+  src = 'michaeljsmith/vim-indent-object',
+  event = { 'BufReadPost', 'BufNewFile' },
+})
+--}}}

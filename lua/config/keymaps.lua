@@ -36,9 +36,16 @@ keyset('i', '<A-f>', '<ESC>lwi')
 keyset('n', 'j', 'gj')
 keyset('n', 'k', 'gk')
 keyset({ 'n', 'i' }, '<C-S>', '<cmd>w<CR><esc>', { desc = 'Save file' })
+keyset('n', '<Leader>w', '<cmd>noa w<CR>', { desc = 'Save file no formatting' })
 keyset('n', '<leader>qq', ':qa<CR>', { desc = 'Quit all' })
 keyset('n', '<leader>x', ':bdelete<CR>', { desc = 'Delete Buffer and Window' })
 keyset('n', ',A', 'ggVG<c-$>', { desc = 'Select All' })
+keyset(
+  'n',
+  '<leader>bo',
+  function() require('utils').close_all_bufs({ close_current = false }) end,
+  { desc = 'Close all buffers' }
+)
 
 -- Comment mappings
 keyset('n', '<C-c>', 'gcc', { remap = true, desc = 'Comment line' })
@@ -90,7 +97,7 @@ keyset('n', '[q', '<cmd>cprev<cr>zvzz', { desc = 'Previous quickfix item' })
 keyset('n', ']q', '<cmd>cnext<cr>zvzz', { desc = 'Next quickfix item' })
 keyset('n', '[l', '<cmd>lprev<cr>zvzz', { desc = 'Previous loclist item' })
 keyset('n', ']l', '<cmd>lnext<cr>zvzz', { desc = 'Next loclist item' })
-vim.keymap.set('n', '<C-q>', function()
+keyset('n', '<C-q>', function()
   local qf_exists = false
   local loc_exists = false
   for _, win in pairs(vim.fn.getwininfo()) do
@@ -143,7 +150,7 @@ keyset('n', 'zm', ':set foldmethod=marker<cr>:set foldlevel=0<cr>', { desc = 'Se
 -- Line number toggle with statuscolumn
 keyset('n', '<leader>tl', function()
   if vim.opt.statuscolumn:get() == '' then
-    vim.opt.statuscolumn = '%s%l %r  '
+    vim.opt.statuscolumn = "%s%{v:lnum == line('.') ? v:lnum : ''}%=%{v:lnum != line('.') ? v:relnum : ''}   "
     vim.opt.number = true
     vim.opt.relativenumber = true
     vim.opt.cursorline = true
@@ -186,10 +193,14 @@ keyset('n', '<C-P>', function()
   local peek = require('utils').lazy_require('peek')
   peek().peek_definition()
 end, { desc = 'Peek Definition' })
-keyset('n', '<leader>pd', function()
+keyset('n', ',d', function()
   local peek = require('utils').lazy_require('peek')
   peek().peek_diagnostics()
 end, { desc = 'Peek Diagnostics' })
+keyset('n', ',f', function()
+  local peek = require('utils').lazy_require('peek')
+  peek().peek_symbols('Function')
+end, { desc = 'Peek Functions' })
 
 -- Terminal mappigs
 keyset('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Enter normal mode' })
