@@ -2,13 +2,14 @@
 
 --: Enabled LSP's {{{
 vim.lsp.enable({
-  "gopls",
-  "lua_ls",
-  "pyright",
-  "ruff",
-  "rust_analyzer",
-  "tailwindcss",
-  "vtsls",
+  'gopls',
+  'lua_ls',
+  'marksman',
+  'pyright',
+  'ruff',
+  'rust_analyzer',
+  'tailwindcss',
+  'vtsls',
 })
 --: }}}
 
@@ -32,30 +33,70 @@ end
 --: }}}
 
 --: On attach autocmd {{{
-local group = vim.api.nvim_create_augroup("idr4n/LspConfig", { clear = true })
-vim.api.nvim_create_autocmd("LspAttach", {
+local group = vim.api.nvim_create_augroup('idr4n/LspConfig', { clear = true })
+vim.api.nvim_create_autocmd('LspAttach', {
   group = group,
-  desc = "Configure LSP keymaps",
-  --stylua: ignore
+  desc = 'Configure LSP keymaps',
   callback = function(args)
     -- Disable semantic_tokens
     vim.lsp.semantic_tokens.enable(false)
 
-    vim.keymap.set({ "n", "v" }, "<leader>ff", vim.lsp.buf.format, { buffer = args.buf, desc = "Format buffer" })
-    vim.keymap.set("n", "gd", vim.lsp.buf.definition, { buffer = args.buf, desc = "Go to definition" })
-    vim.keymap.set("n", '[e', function() vim.diagnostic.jump { count = -1, severity = vim.diagnostic.severity.ERROR } end, { buffer = args.buf, desc = "Previous Error" })
-    vim.keymap.set("n", ']e', function() vim.diagnostic.jump { count = -1, severity = vim.diagnostic.severity.ERROR } end, { buffer = args.buf, desc = "Next Error" })
-    vim.keymap.set("n", "<leader>th", function()
-      vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = args.buf }), { bufnr = args.buf })
-    end, { buffer = args.buf, desc = "Toggle inlay hints" })
+    vim.keymap.set({ 'n', 'v' }, '<leader>ff', vim.lsp.buf.format, { buffer = args.buf, desc = 'Format buffer' })
+    vim.keymap.set('n', 'gd', vim.lsp.buf.definition, { buffer = args.buf, desc = 'Go to definition' })
+    vim.keymap.set('i', '<c-q>', vim.lsp.buf.signature_help, { buffer = args.buf, desc = 'Signature help' })
+    vim.keymap.set(
+      'n',
+      '[e',
+      function() vim.diagnostic.jump({ count = -1, severity = vim.diagnostic.severity.ERROR }) end,
+      { buffer = args.buf, desc = 'Previous Error' }
+    )
+    vim.keymap.set(
+      'n',
+      ']e',
+      function() vim.diagnostic.jump({ count = -1, severity = vim.diagnostic.severity.ERROR }) end,
+      { buffer = args.buf, desc = 'Next Error' }
+    )
+    vim.keymap.set(
+      'n',
+      '<leader>th',
+      function()
+        vim.lsp.inlay_hint.enable(not vim.lsp.inlay_hint.is_enabled({ bufnr = args.buf }), { bufnr = args.buf })
+      end,
+      { buffer = args.buf, desc = 'Toggle inlay hints' }
+    )
+
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+
+    -- Manual document highlighting toggle with ,s
+    if client and client:supports_method(vim.lsp.protocol.Methods.textDocument_documentHighlight, args.buf) then
+      local is_highlighted = false
+
+      local function toggle_highlight()
+        if is_highlighted then
+          vim.lsp.buf.clear_references()
+          is_highlighted = false
+        else
+          vim.lsp.buf.document_highlight()
+          is_highlighted = true
+          -- Auto-clear after 4 seconds
+          vim.defer_fn(function()
+            if is_highlighted then
+              vim.lsp.buf.clear_references()
+              is_highlighted = false
+            end
+          end, 4000)
+        end
+      end
+      vim.keymap.set('n', ',s', toggle_highlight, { buffer = args.buf, desc = 'Toggle symbol highlight' })
+    end
   end,
 })
 --: }}}
 
 --: Other LSP mappings {{{
-vim.keymap.set("n", "<leader>td", toggle_diagnostics, { desc = "Toggle diagnostics" })
-vim.keymap.set('n', '<leader>zd', vim.diagnostic.setloclist, { desc = "Buffer Diagnostics to loclist" })
-vim.keymap.set('n', '<leader>zD', vim.diagnostic.setqflist, { desc = "Diagnostics to quickfix" })
+vim.keymap.set('n', '<leader>td', toggle_diagnostics, { desc = 'Toggle diagnostics' })
+vim.keymap.set('n', '<leader>zd', vim.diagnostic.setloclist, { desc = 'Buffer Diagnostics to loclist' })
+vim.keymap.set('n', '<leader>zD', vim.diagnostic.setqflist, { desc = 'Diagnostics to quickfix' })
 --: }}}
 
 --: LSP Custom Commands {{{
@@ -64,7 +105,7 @@ vim.api.nvim_create_user_command('LspInfo', function() vim.cmd('checkhealth vim.
 
 -- Custom LspRestart command
 vim.api.nvim_create_user_command('LspRestart', function(opts)
-  local client_name = opts.args ~= "" and opts.args or nil
+  local client_name = opts.args ~= '' and opts.args or nil
 
   if client_name then
     -- Restart specific client
@@ -72,9 +113,7 @@ vim.api.nvim_create_user_command('LspRestart', function(opts)
     for _, client in ipairs(clients) do
       vim.lsp.stop_client(client.id)
     end
-    vim.defer_fn(function()
-      vim.lsp.enable(client_name)
-    end, 500)
+    vim.defer_fn(function() vim.lsp.enable(client_name) end, 500)
   else
     -- Restart all clients for current buffer
     local clients = vim.lsp.get_clients({ bufnr = 0 })
@@ -91,14 +130,17 @@ vim.api.nvim_create_user_command('LspRestart', function(opts)
       end
     end, 500)
   end
-end, { nargs = '?', complete = function()
-  local clients = vim.lsp.get_clients()
-  return vim.tbl_map(function(client) return client.name end, clients)
-end })
+end, {
+  nargs = '?',
+  complete = function()
+    local clients = vim.lsp.get_clients()
+    return vim.tbl_map(function(client) return client.name end, clients)
+  end,
+})
 
 -- Custom LspStop command
 vim.api.nvim_create_user_command('LspStop', function(opts)
-  local client_name = opts.args ~= "" and opts.args or nil
+  local client_name = opts.args ~= '' and opts.args or nil
 
   if client_name then
     local clients = vim.lsp.get_clients({ name = client_name })
@@ -112,8 +154,11 @@ vim.api.nvim_create_user_command('LspStop', function(opts)
       vim.lsp.stop_client(client.id)
     end
   end
-end, { nargs = '?', complete = function()
-  local clients = vim.lsp.get_clients()
-  return vim.tbl_map(function(client) return client.name end, clients)
-end })
+end, {
+  nargs = '?',
+  complete = function()
+    local clients = vim.lsp.get_clients()
+    return vim.tbl_map(function(client) return client.name end, clients)
+  end,
+})
 --: }}}
