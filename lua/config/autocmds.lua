@@ -65,6 +65,16 @@ aucmd({ 'BufReadPost', 'BufNewFile' }, {
   group = augroup('LazyLoadStatusline'),
   once = true,
   callback = function() vim.opt.statusline = '%!v:lua.require("config.statusline").StatusLine()' end,
+
+-- Setup ZK backlinks for markdown files
+local zk_group = augroup('ZK_Setup')
+aucmd('FileType', {
+  group = zk_group,
+  pattern = 'markdown',
+  callback = function()
+    local zk = require('zk')
+    if zk.is_zk_note() then zk.setup_auto_backlinks() end
+  end,
 })
 
 -- Redraw statusline on DiagnosticChanged
