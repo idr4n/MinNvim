@@ -3,32 +3,22 @@ local M = {}
 M.cache = {}
 
 function M.get_backlinks(path)
-  -- Check cache first
   if M.cache[path] then return M.cache[path] end
 
-  local current_file = path
-  local result = vim.fn.system(string.format('zk list -q -f json -l "%s"', current_file))
-  -- print(result)
+  local result = vim.fn.system(string.format('zk list -q -f json -l "%s"', path))
+  local paths = {}
 
   if vim.v.shell_error == 0 then
-    local paths = {}
-
-    -- Parse JSON response
     local ok, json_data = pcall(vim.fn.json_decode, result)
-    -- print(vim.inspect(json_data))
     if ok and json_data then
       for _, note in ipairs(json_data) do
         if note.path then table.insert(paths, note.path) end
       end
     end
-
-    -- Cache the result
-    M.cache[path] = paths
-    return paths
-  else
-    M.cache[path] = {} -- Cache empty result to avoid retrying
-    return {}
   end
+
+  M.cache[path] = paths
+  return paths
 end
 
 -- Clear all cache
@@ -46,12 +36,12 @@ function M.cache_info()
 end
 
 -- Check if current buffer is in ZK directory
-function M.is_zk_note()
+function M.is_zk_note(bufnr)
   local zk_dir = vim.env.ZK_NOTEBOOK_DIR
   if not zk_dir then return false end
 
-  local current_file = vim.fn.expand('%:p')
-  return vim.startswith(current_file, zk_dir)
+  local file_path = bufnr and vim.api.nvim_buf_get_name(bufnr) or vim.fn.expand('%:p')
+  return vim.startswith(file_path, zk_dir)
 end
 
 -- Namespace for our virtual text
@@ -60,24 +50,28 @@ local ns_id = vim.api.nvim_create_namespace('zk_backlinks')
 -- Store backlink data for navigation
 local backlink_data = {}
 
--- Add backlinks as virtual text at top of buffer
-function M.show_backlinks()
-  if not M.is_zk_note() then return end
-
-  local current_file = vim.fn.expand('%:p')
-  local backlinks = M.get_backlinks(current_file)
-
-  if #backlinks == 0 then return end
-
+-- Buffer utilities
+local function get_current_buffer_info()
   local bufnr = vim.api.nvim_get_current_buf()
+  local file_path = vim.fn.expand('%:p')
+  return bufnr, file_path
+end
 
-  -- Clear existing backlinks
-  vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
+local function get_zk_file_path(relative_path)
+  local zk_dir = vim.env.ZK_NOTEBOOK_DIR
+  return zk_dir and (zk_dir .. '/' .. relative_path) or relative_path
+end
 
-  -- Store backlink data for this buffer
-  backlink_data[bufnr] = backlinks
+local function is_valid_zk_buffer(bufnr, zk_dir)
+  if not vim.api.nvim_buf_is_valid(bufnr) or not vim.api.nvim_buf_is_loaded(bufnr) then return false end
 
-  -- Create all virtual lines in one extmark for proper ordering
+  if vim.bo[bufnr].filetype ~= 'markdown' then return false end
+
+  local buf_path = vim.api.nvim_buf_get_name(bufnr)
+  return buf_path ~= '' and vim.startswith(buf_path, zk_dir)
+end
+
+local function create_backlink_virtual_lines(backlinks)
   local virt_lines = {}
 
   -- Add empty line between title and backlinks
@@ -96,7 +90,45 @@ function M.show_backlinks()
   -- Add separator after backlinks
   table.insert(virt_lines, { { '', 'Normal' } })
 
-  -- Add all virtual lines after line 0 (title)
+  return virt_lines
+end
+
+local function setup_navigation_keymaps(bufnr)
+  -- Enter key navigation
+  vim.keymap.set('n', '<CR>', function()
+    if M.is_in_backlinks_area() and M.navigate_to_backlink(1) then return end
+    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<CR>', true, false, true), 'n', false)
+  end, { buffer = bufnr, silent = true, desc = 'Navigate to first backlink or normal enter' })
+
+  -- Number keys 1-9 for specific backlink navigation
+  for i = 1, 9 do
+    vim.keymap.set('n', tostring(i), function()
+      local links = backlink_data[bufnr]
+      if links and links[i] and M.is_in_backlinks_area() then
+        M.navigate_to_backlink(i)
+      else
+        vim.api.nvim_feedkeys(tostring(i), 'n', false)
+      end
+    end, { buffer = bufnr, silent = true, desc = 'Navigate to backlink ' .. i .. ' or insert number' })
+  end
+end
+
+-- Add backlinks as virtual text at top of buffer
+function M.show_backlinks()
+  local bufnr, current_file = get_current_buffer_info()
+  if not M.is_zk_note(bufnr) then return end
+
+  local backlinks = M.get_backlinks(current_file)
+  if #backlinks == 0 then return end
+
+  -- Clear existing backlinks
+  vim.api.nvim_buf_clear_namespace(bufnr, ns_id, 0, -1)
+
+  -- Store backlink data for this buffer
+  backlink_data[bufnr] = backlinks
+
+  -- Create and display virtual lines
+  local virt_lines = create_backlink_virtual_lines(backlinks)
   vim.api.nvim_buf_set_extmark(bufnr, ns_id, 0, 0, {
     virt_lines = virt_lines,
     virt_lines_above = false,
@@ -109,13 +141,10 @@ function M.navigate_to_backlink(index)
   local links = backlink_data[bufnr]
   if not links or #links == 0 then return false end
 
-  -- If no index provided, navigate to first backlink
   index = index or 1
-
   local selected_link = links[index]
   if selected_link then
-    local zk_dir = vim.env.ZK_NOTEBOOK_DIR
-    local full_path = zk_dir and (zk_dir .. '/' .. selected_link) or selected_link
+    local full_path = get_zk_file_path(selected_link)
     vim.cmd('edit ' .. vim.fn.fnameescape(full_path))
     return true
   end
@@ -168,24 +197,21 @@ local function setup_global_cache_invalidation()
 
         -- Refresh backlinks in all currently open ZK note buffers
         for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-          if vim.api.nvim_buf_is_loaded(buf) and vim.bo[buf].filetype == 'markdown' then
-            local buf_path = vim.api.nvim_buf_get_name(buf)
-            if buf_path ~= '' and vim.startswith(buf_path, zk_dir) then
-              -- Schedule update for this buffer
-              vim.schedule(function()
-                if vim.api.nvim_buf_is_valid(buf) then
-                  local current_buf = vim.api.nvim_get_current_buf()
-                  if buf == current_buf then
-                    -- If it's the current buffer, refresh immediately
-                    M.show_backlinks()
-                  else
-                    -- For other buffers, we'll refresh when they become active
-                    -- Clear their cached data so it refreshes on BufEnter
-                    backlink_data[buf] = nil
-                  end
+          if is_valid_zk_buffer(buf, zk_dir) then
+            -- Schedule update for this buffer
+            vim.schedule(function()
+              if vim.api.nvim_buf_is_valid(buf) then
+                local current_buf = vim.api.nvim_get_current_buf()
+                if buf == current_buf then
+                  -- If it's the current buffer, refresh immediately
+                  M.show_backlinks()
+                else
+                  -- For other buffers, we'll refresh when they become active
+                  -- Clear their cached data so it refreshes on BufEnter
+                  backlink_data[buf] = nil
                 end
-              end)
-            end
+              end
+            end)
           end
         end
       end
@@ -211,7 +237,7 @@ function M.setup_auto_backlinks()
     group = group,
     buffer = bufnr,
     callback = function()
-      if M.is_zk_note() then M.show_backlinks() end
+      if M.is_zk_note(bufnr) then M.show_backlinks() end
     end,
   })
 
@@ -223,24 +249,7 @@ function M.setup_auto_backlinks()
   })
 
   -- Setup buffer-local keymaps
-  vim.keymap.set('n', '<CR>', function()
-    if M.is_in_backlinks_area() and M.navigate_to_backlink(1) then return end
-    -- Default behavior: just press enter
-    vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes('<CR>', true, false, true), 'n', false)
-  end, { buffer = bufnr, silent = true, desc = 'Navigate to first backlink or normal enter' })
-
-  -- Number keys 1-9 to navigate to specific backlinks
-  for i = 1, 9 do
-    vim.keymap.set('n', tostring(i), function()
-      local links = backlink_data[bufnr]
-      if links and links[i] and M.is_in_backlinks_area() then
-        M.navigate_to_backlink(i)
-      else
-        -- Default behavior: insert the number
-        vim.api.nvim_feedkeys(tostring(i), 'n', false)
-      end
-    end, { buffer = bufnr, silent = true, desc = 'Navigate to backlink ' .. i .. ' or insert number' })
-  end
+  setup_navigation_keymaps(bufnr)
 end
 
 return M
