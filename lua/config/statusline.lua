@@ -111,6 +111,19 @@ end
 ---@return string Formatted position string (line:column)
 function M.get_position() return ' %3l:%-2c ' end
 
+-- Position scrollbar indicator
+function M.scrollbar()
+  local sbar_chars = { '󰋙', '󰫃', '󰫄', '󰫅', '󰫆', '󰫇', '󰫈' }
+
+  local cur_line = vim.api.nvim_win_get_cursor(0)[1]
+  local lines = vim.api.nvim_buf_line_count(0)
+
+  local i = math.floor((cur_line - 1) / lines * #sbar_chars) + 1
+  local sbar = sbar_chars[i]
+
+  return hl_str('DiagnosticInfo', ' ' .. sbar .. '  ')
+end
+
 ---@param opts? {show_count?: boolean} Options table with show_count defaulting to false
 ---@return string
 function M.lsp_diagnostics(opts)
@@ -190,6 +203,7 @@ function M.StatusLine()
     M.fileinfo(),
     '%=',
     M.get_position(),
+    M.scrollbar(),
     M.lsp_diagnostics({ show_count = false }),
     M.git_status_simple(),
   }
