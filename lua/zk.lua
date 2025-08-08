@@ -2,6 +2,7 @@ local M = {}
 local zk_dir = vim.env.ZK_NOTEBOOK_DIR
 
 M.cache = {}
+local pre_save_links = {}
 
 function M.get_backlinks(path)
   if M.cache[path] then return M.cache[path] end
@@ -172,6 +173,68 @@ function M.hide_backlinks()
   backlink_data[bufnr] = nil
 end
 
+-- Get list of notes that a file links to
+local function get_linked_notes(file_path)
+  local result = vim.fn.system(string.format('zk list -q -f json -L "%s"', file_path))
+  local linked_notes = {}
+
+  if vim.v.shell_error == 0 then
+    local ok, json_data = pcall(vim.fn.json_decode, result)
+    if ok and json_data then
+      for _, note in ipairs(json_data) do
+        if note.path then
+          local abs_path = get_zk_file_path(note.path)
+          linked_notes[abs_path] = true
+        end
+      end
+    end
+  end
+
+  return linked_notes
+end
+
+-- update only affected buffers after saving
+local function refresh_affected_buffers(saved_file_path)
+  -- Get current links after save
+  local post_save_links = get_linked_notes(saved_file_path)
+  local pre_links = pre_save_links[saved_file_path] or {}
+
+  -- Find all notes that were affected (added or removed links)
+  local affected_notes = {}
+
+  -- Add notes that are now linked (new links)
+  for note_path, _ in pairs(post_save_links) do
+    affected_notes[note_path] = true
+  end
+
+  -- Add notes that were previously linked but no longer (removed links)
+  for note_path, _ in pairs(pre_links) do
+    affected_notes[note_path] = true
+  end
+
+  -- Clear cache for the saved file and all affected notes
+  M.clear_cache_for(saved_file_path)
+  for note_path, _ in pairs(affected_notes) do
+    M.clear_cache_for(note_path)
+  end
+
+  -- Find and refresh only the open buffers that correspond to affected notes
+  for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+    if is_valid_zk_buffer(buf, zk_dir) then
+      local buf_path = vim.api.nvim_buf_get_name(buf)
+
+      -- Check if this buffer is one of the affected notes (but not the saved file itself)
+      if affected_notes[buf_path] and buf_path ~= saved_file_path then
+        -- Clear cached data so it refreshes on BufEnter
+        backlink_data[buf] = nil
+      end
+    end
+  end
+
+  -- Clean up pre-save data
+  pre_save_links[saved_file_path] = nil
+end
+
 -- Setup global cache invalidation (called once)
 local global_setup_done = false
 local function setup_global_cache_invalidation()
@@ -180,37 +243,25 @@ local function setup_global_cache_invalidation()
 
   local global_group = vim.api.nvim_create_augroup('ZKGlobalCacheInvalidation', { clear = true })
 
-  -- Clear cache when ANY markdown file in ZK directory is written
+  -- Capture links before saving
+  vim.api.nvim_create_autocmd('BufWritePre', {
+    group = global_group,
+    pattern = '*.md',
+    callback = function()
+      local file_path = vim.fn.expand('<afile>:p')
+
+      if zk_dir and vim.startswith(file_path, zk_dir) then pre_save_links[file_path] = get_linked_notes(file_path) end
+    end,
+  })
+
+  -- Update affected buffers after saving
   vim.api.nvim_create_autocmd('BufWritePost', {
     group = global_group,
     pattern = '*.md',
     callback = function()
       local file_path = vim.fn.expand('<afile>:p')
 
-      -- If the written file is in ZK directory, clear cache and refresh all ZK buffers
-      if zk_dir and vim.startswith(file_path, zk_dir) then
-        M.clear_cache()
-
-        -- Refresh backlinks in all currently open ZK note buffers
-        for _, buf in ipairs(vim.api.nvim_list_bufs()) do
-          if is_valid_zk_buffer(buf, zk_dir) then
-            -- Schedule update for this buffer
-            vim.schedule(function()
-              if vim.api.nvim_buf_is_valid(buf) then
-                local current_buf = vim.api.nvim_get_current_buf()
-                if buf == current_buf then
-                  -- If it's the current buffer, refresh immediately
-                  M.show_backlinks()
-                else
-                  -- For other buffers, we'll refresh when they become active
-                  -- Clear their cached data so it refreshes on BufEnter
-                  backlink_data[buf] = nil
-                end
-              end
-            end)
-          end
-        end
-      end
+      if zk_dir and vim.startswith(file_path, zk_dir) then refresh_affected_buffers(file_path) end
     end,
   })
 end
