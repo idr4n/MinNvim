@@ -1,4 +1,5 @@
 local M = {}
+local zk_dir = vim.env.ZK_NOTEBOOK_DIR
 
 M.cache = {}
 
@@ -37,7 +38,6 @@ end
 
 -- Check if current buffer is in ZK directory
 function M.is_zk_note(bufnr)
-  local zk_dir = vim.env.ZK_NOTEBOOK_DIR
   if not zk_dir then return false end
 
   local file_path = bufnr and vim.api.nvim_buf_get_name(bufnr) or vim.fn.expand('%:p')
@@ -57,10 +57,7 @@ local function get_current_buffer_info()
   return bufnr, file_path
 end
 
-local function get_zk_file_path(relative_path)
-  local zk_dir = vim.env.ZK_NOTEBOOK_DIR
-  return zk_dir and (zk_dir .. '/' .. relative_path) or relative_path
-end
+local function get_zk_file_path(relative_path) return zk_dir and (zk_dir .. '/' .. relative_path) or relative_path end
 
 local function is_valid_zk_buffer(bufnr, zk_dir)
   if not vim.api.nvim_buf_is_valid(bufnr) or not vim.api.nvim_buf_is_loaded(bufnr) then return false end
@@ -74,7 +71,7 @@ end
 local function create_backlink_virtual_lines(backlinks)
   local virt_lines = {}
 
-  -- Add empty line between title and backlinks
+  -- empty line between title and backlinks
   table.insert(virt_lines, { { '', 'Normal' } })
 
   -- Add header
@@ -189,7 +186,6 @@ local function setup_global_cache_invalidation()
     pattern = '*.md',
     callback = function()
       local file_path = vim.fn.expand('<afile>:p')
-      local zk_dir = vim.env.ZK_NOTEBOOK_DIR
 
       -- If the written file is in ZK directory, clear cache and refresh all ZK buffers
       if zk_dir and vim.startswith(file_path, zk_dir) then
