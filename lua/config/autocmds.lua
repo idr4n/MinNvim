@@ -60,11 +60,12 @@ vim.api.nvim_create_autocmd('TextYankPost', {
   callback = function() vim.highlight.on_yank({ timeout = 70 }) end,
 })
 
--- Lazy load statusline
-aucmd({ 'BufReadPost', 'BufNewFile' }, {
-  group = augroup('LazyLoadStatusline'),
-  once = true,
-  callback = function() vim.opt.statusline = '%!v:lua.require("config.statusline").StatusLine()' end,
+-- Wrap text for some markdown files and others
+aucmd('FileType', {
+  group = augroup('md-tex-aucmd'),
+  pattern = { 'markdown', 'tex', 'typst', 'quarto' },
+  callback = function() vim.cmd('setlocal wrap') end,
+})
 
 -- Setup ZK backlinks for markdown files
 local zk_group = augroup('ZK_Setup')
@@ -90,6 +91,15 @@ aucmd('FileChangedShellPost', {
   callback = function()
     vim.schedule(function() vim.cmd('e') end)
   end,
+})
+
+-- LAZY LOADING
+
+-- Lazy load statusline
+aucmd({ 'BufReadPost', 'BufNewFile' }, {
+  group = augroup('LazyLoadStatusline'),
+  once = true,
+  callback = function() vim.opt.statusline = '%!v:lua.require("config.statusline").StatusLine()' end,
 })
 
 -- Lazy load commands
