@@ -59,13 +59,13 @@ end
 
 local function get_zk_file_path(relative_path) return zk_dir and (zk_dir .. '/' .. relative_path) or relative_path end
 
-local function is_valid_zk_buffer(bufnr, zk_dir)
+local function is_valid_zk_buffer(bufnr, zk_directory)
   if not vim.api.nvim_buf_is_valid(bufnr) or not vim.api.nvim_buf_is_loaded(bufnr) then return false end
 
   if vim.bo[bufnr].filetype ~= 'markdown' then return false end
 
   local buf_path = vim.api.nvim_buf_get_name(bufnr)
-  return buf_path ~= '' and vim.startswith(buf_path, zk_dir)
+  return buf_path ~= '' and vim.startswith(buf_path, zk_directory)
 end
 
 local function create_backlink_virtual_lines(backlinks)
