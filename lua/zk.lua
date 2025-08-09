@@ -266,6 +266,76 @@ local function setup_global_cache_invalidation()
   })
 end
 
+local function zk_completion(arg_lead)
+  if not zk_dir then return {} end
+
+  -- Build the search path
+  local search_path = zk_dir
+  if arg_lead ~= '' then search_path = zk_dir .. '/' .. arg_lead end
+
+  -- Get completions
+  local completions = {}
+  local glob_pattern = search_path .. '*'
+  local matches = vim.fn.glob(glob_pattern, false, true)
+
+  for _, match in ipairs(matches) do
+    -- Remove zk_dir prefix to get relative path
+    local relative = match:sub(#zk_dir + 2) -- +2 to remove the trailing slash
+
+    -- Add trailing slash for directories
+    if vim.fn.isdirectory(match) == 1 then relative = relative .. '/' end
+
+    table.insert(completions, relative)
+  end
+
+  return completions
+end
+
+-- Create new zk note with title prompt and smart path parsing
+function M.new_note()
+  -- Make completion function globally accessible with namespace
+  _G.zk = _G.zk or {}
+  _G.zk.completion = zk_completion
+
+  local input = vim.fn.input({
+    prompt = 'Note title (with optional path): ',
+    completion = 'customlist,v:lua.zk.completion',
+    default = '',
+  })
+  if input == '' then
+    print('Note creation cancelled')
+    return
+  end
+
+  local dir = nil
+  local title = input
+
+  -- Check if input contains a path separator
+  local last_slash = input:match('^.*/()')
+  if last_slash then
+    dir = input:sub(1, last_slash - 2) -- Remove the trailing slash
+    title = input:sub(last_slash)
+  end
+
+  -- Build zk command
+  local cmd = 'zk new'
+  if dir then cmd = cmd .. ' ' .. vim.fn.shellescape(dir) end
+  cmd = cmd .. ' -t ' .. vim.fn.shellescape(title) .. ' -p'
+
+  -- Execute command and capture output (file path)
+  local result = vim.fn.system(cmd)
+  if vim.v.shell_error == 0 then
+    local file_path = vim.trim(result)
+    if file_path ~= '' then
+      -- Open the newly created file
+      vim.cmd('edit ' .. vim.fn.fnameescape(file_path))
+      print('Created note: ' .. title .. (dir and ' in ' .. dir or ''))
+    end
+  else
+    print('Error creating note: ' .. result)
+  end
+end
+
 -- Setup autocommands for automatic backlink display
 function M.setup_auto_backlinks()
   local bufnr = vim.api.nvim_get_current_buf()
