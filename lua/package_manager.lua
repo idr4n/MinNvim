@@ -672,6 +672,13 @@ function M.update(opts)
     '',
   })
 
+  -- setup quit keymap for debug buffer
+  vim.keymap.set('n', 'q', function() vim.api.nvim_win_close(0, true) end, {
+    buffer = buf,
+    noremap = true,
+    silent = true,
+  })
+
   -- Start sequential processing
   vim.schedule(function() process_plugins_updates(enabled_plugins, buf) end)
 end
