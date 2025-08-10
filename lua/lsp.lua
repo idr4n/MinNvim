@@ -4,12 +4,13 @@
 vim.lsp.enable({
   'gopls',
   'lua_ls',
-  'marksman',
+  -- 'marksman',
   'pyright',
   'ruff',
   'rust_analyzer',
   'tailwindcss',
   'vtsls',
+  'zk',
 })
 --: }}}
 
