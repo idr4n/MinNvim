@@ -167,6 +167,17 @@ map('n', '<leader>mt', function()
   end
 end, { desc = 'Custom command: TypstWatch Toggle' })
 
+-- open same file in nvim in a new tmux pane
+command('NewTmuxNvim', function()
+  if os.getenv('TERM_PROGRAM') == 'tmux' and vim.fn.expand('%'):len() > 0 then
+    -- vim.cmd("execute 'silent !tmux new-window nvim %'")
+    vim.cmd("execute 'silent !tmux split-window -h -e NVIM_APPNAME=MinNvim nvim %'")
+  else
+    print('Nothing to open...')
+  end
+end, {})
+map('n', '<leader>on', '<cmd>NewTmuxNvim<cr>', { desc = 'Open Same file in TMUX window' })
+
 -- Function to shuffle lines
 local function shuffle_lines()
   local start_line = vim.fn.line("'<")
