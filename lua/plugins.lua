@@ -16,6 +16,37 @@ p({
     })
   end,
 })
+
+p({
+  src = 'nvim-treesitter/nvim-treesitter-textobjects',
+  event = 'LspAttach',
+  config = function()
+    local opts = {
+      textobjects = {
+        select = {
+          enable = true,
+          lookahead = true,
+          keymaps = {
+            ['af'] = '@function.outer',
+            ['if'] = '@function.inner',
+            ['ac'] = '@conditional.outer',
+            ['ic'] = '@conditional.inner',
+            ['al'] = '@loop.outer',
+            ['il'] = '@loop.inner',
+          },
+        },
+        lsp_interop = {
+          enable = true,
+          border = 'rounded',
+          peek_definition_code = {
+            ['<leader>dp'] = '@function.outer',
+          },
+        },
+      },
+    }
+    require('nvim-treesitter.configs').setup(opts)
+  end,
+})
 --: }}}
 
 --: Lazy load conform {{{
@@ -144,62 +175,6 @@ p({
 })
 --: }}}
 
---: Lazy load fzf-lua {{{
-p({
-  src = 'ibhagwan/fzf-lua',
-  cmd = 'FzfLua',
-  config = function()
-    require('fzf-lua').setup({
-      winopts = {
-        -- Open in a split at the bottom instead of floating window
-        -- split = "belowright 13new",
-        row = 0.5,
-        height = 0.7,
-        width = 89,
-        backdrop = 100,
-        preview = {
-          hidden = true,
-          layout = 'vertical',
-          -- layout = "horizontal",
-          vertical = 'down:50%',
-          horizontal = 'right:50%',
-        },
-      },
-      keymap = {
-        builtin = {
-          ['<C-l>'] = 'toggle-preview',
-          ['<C-d>'] = 'preview-page-down',
-          ['<C-u>'] = 'preview-page-up',
-        },
-        fzf = {
-          ['ctrl-l'] = 'toggle-preview',
-          ['ctrl-q'] = 'select-all+accept',
-        },
-      },
-    })
-  end,
-  keys = {
-    -- { 'n', '<C-Space>', '<cmd>FzfLua files<cr>', { desc = 'FzfLua Files' } },
-    -- { 'n', '<leader>sf', '<cmd>FzfLua files<cr>', { desc = 'FzfLua Files' } },
-    { 'n', '<leader>sk', '<cmd>FzfLua keymaps<cr>', { desc = 'FzfLua Keymaps' } },
-    { 'n', '<leader>r', '<cmd>FzfLua live_grep<cr>', { desc = 'FzfLua Live Grep' } },
-    { 'n', '<leader>or', '<cmd>FzfLua resume<cr>', { desc = 'FzfLua Resume' } },
-    {
-      'n',
-      '<leader>sl',
-      function() require('fzf-lua').highlights({ winopts = { preview = { hidden = false } } }) end,
-      { desc = 'FzfLua Highlights' },
-    },
-    {
-      'n',
-      '<leader>gs',
-      function() require('fzf-lua').git_status({ winopts = { preview = { hidden = false } } }) end,
-      { desc = 'FzfLua Git Status' },
-    },
-  },
-})
---: }}}
-
 --: Lazy load nvim-highlight-colors {{{
 p({
   src = 'brenoprata10/nvim-highlight-colors',
@@ -278,13 +253,13 @@ p({
 --: Lazy load fff.nvim {{{
 p({
   src = 'dmtrKovalenko/fff.nvim',
-  event = 'VimEnter',
+  dependencies = { 'echasnovski/mini.icons' },
   build = 'cargo build --release',
   config = function()
     require('fff').setup({
       preview = { enabled = true },
       -- debug = { show_scores = true, }, -- Toggle with F2 or :FFFDebug
-      icons = { enabled = false },
+      -- icons = { enabled = false },
       keymaps = {
         move_up = { '<Up>', '<C-p>', '<C-k>' },
         move_down = { '<Down>', '<C-n>', '<C-j>' },
@@ -299,111 +274,202 @@ p({
 })
 --}}}
 
---: Lazy load misc plugins {{{
+--: Lazy load mini.icons {{{
 p({
-  src = 'idr4n/netrw-preview.nvim',
-  config = function()
-    require('netrw-preview').setup({
-      preview_width = 65,
-      mappings = {
-        close_netrw = { 'q', 'gq', '<c-q>' },
-        toggle_preview = { 'p', '<Tab>' },
-        directory_mappings = {
-          { key = '~', path = '~', desc = 'Home directory' },
-          { key = 'gd', path = '~/Downloads', desc = 'Downloads directory' },
-          { key = 'gw', path = function() return vim.fn.getcwd() end, desc = 'Current working directory' },
-        },
-      },
-    })
+  src = 'echasnovski/mini.icons',
+  init = function()
+    package.preload['nvim-web-devicons'] = function()
+      require('mini.icons').mock_nvim_web_devicons()
+      return package.loaded['nvim-web-devicons']
+    end
   end,
-  keys = {
-    { 'n', ',,', '<cmd>NetrwRevealToggle<cr>', { desc = 'Toggle Netrw - Reveal' } },
-    { 'n', ',l', '<cmd>NetrwRevealLexToggle<cr>', { desc = 'Toggle Netrw (Lex) - Reveal' } },
-  },
-})
-p({
-  src = 'zk-org/zk-nvim',
-  dependencies = { 'ibhagwan/fzf-lua' },
-  ft = 'markdown',
-  cmd = { 'ZkNotes', 'ZkTags', 'ZkBacklinks' },
-  keys = {
-    { 'n', '<leader>nf', "<cmd>ZkNotes { sort = { 'modified' } }<cr>", { silent = true, desc = 'ZK Find Notes' } },
-    {
-      'n',
-      '<leader>nn',
-      "<Cmd>ZkNew { title = vim.fn.input('Title: ') }<CR>",
-      { silent = true, desc = 'ZK New Note' },
-    },
-    { 'n', '<leader>nd', "<cmd>ZkNew { dir = 'journal/daily' }<cr>", { silent = true, desc = 'ZK Daily Note' } },
-    { 'n', '<leader>nw', "<Cmd>ZkNew { dir = 'journal/weekly' }<CR>", { silent = true, desc = 'ZK Weekly Note' } },
-    { 'n', '<leader>nt', '<Cmd>ZkTag<CR>', { silent = true, desc = 'ZK Tags' } },
-    { 'n', '<leader>nb', '<Cmd>ZkBacklinks<CR>', { silent = true, desc = 'ZK Backlinks' } },
-    {
-      'n',
-      '<leader>nss',
-      "<Cmd>ZkNotes { sort = { 'modified' }, match = { vim.fn.input('Search: ') } }<CR>",
-      { silent = true, desc = 'ZK Search query' },
-    },
-    { 'n', '<leader>nsd', '<Cmd>ZkNotesDaily<CR>', { silent = true, desc = 'ZK Search Daily Notes' } },
-    { 'n', '<leader>nsw', '<Cmd>ZkNotesWeekly<CR>', { silent = true, desc = 'ZK Search Weekly Notes' } },
-  },
   config = function()
-    local zk = require('zk')
-    local commands = require('zk.commands')
+    local opts = function()
+      vim.api.nvim_set_hl(0, 'MiniIconsAzure', { fg = '#28A2D4' })
+      return {
+        file = {
+          ['.keep'] = { glyph = '󰊢', hl = 'MiniIconsGrey' },
+          ['devcontainer.json'] = { glyph = '', hl = 'MiniIconsAzure' },
+          README = { glyph = '', hl = 'MiniIconsYellow' },
+          ['README.md'] = { glyph = '', hl = 'MiniIconsYellow' },
+          ['README.txt'] = { glyph = '', hl = 'MiniIconsYellow' },
+        },
+        filetype = {
+          dotenv = { glyph = '', hl = 'MiniIconsYellow' },
+          rust = { glyph = '🦀', hl = 'MiniIconsOrange' },
+        },
+      }
+    end
+    require('mini.icons').setup(opts())
+  end,
+})
+--: }}}
 
-    local function make_edit_fn(defaults, picker_options)
-      return function(options)
-        options = vim.tbl_extend('force', defaults, options or {})
-        zk.edit(options, picker_options)
+--: Lazy load Oil.nvim {{{
+p({
+  src = 'stevearc/oil.nvim',
+  cmd = 'Oil',
+  dependencies = { 'echasnovski/mini.icons' },
+  init = function()
+    if vim.fn.argc(-1) == 1 then
+      local stat = vim.loop.fs_stat(vim.fn.argv(0))
+      if stat and stat.type == 'directory' then
+        load_request('mini.icons')
+        load_request('oil.nvim')
+        require('oil')
       end
     end
-
-    commands.add(
-      'ZkNotesDaily',
-      make_edit_fn({ hrefs = { 'journal/daily' }, sort = { 'modified' } }, { title = 'Zk Daily Notes' })
-    )
-    commands.add(
-      'ZkNotesWeekly',
-      make_edit_fn({ hrefs = { 'journal/weekly' }, sort = { 'modified' } }, { title = 'Zk Weekly Notes' })
-    )
-
-    require('zk').setup({
-      picker = 'fzf_lua',
-    })
   end,
-})
-p({
-  src = 'nvim-treesitter/nvim-treesitter-textobjects',
-  event = 'LspAttach',
+  keys = {
+    { 'n', '-', '<cmd>Oil<cr>', { desc = 'Oil - Parent Dir' } },
+    { 'n', '<leader>oo', '<cmd>Oil --float<cr>', { desc = 'Oil Float - Parent Dir' } },
+  },
   config = function()
     local opts = {
-      textobjects = {
-        select = {
-          enable = true,
-          lookahead = true,
-          keymaps = {
-            ['af'] = '@function.outer',
-            ['if'] = '@function.inner',
-            ['ac'] = '@conditional.outer',
-            ['ic'] = '@conditional.inner',
-            ['al'] = '@loop.outer',
-            ['il'] = '@loop.inner',
-          },
+      default_file_explorer = true,
+      view_options = {
+        show_hidden = true,
+      },
+      float = {
+        padding = 2,
+        max_width = 90,
+        max_height = 0,
+      },
+      win_options = {
+        wrap = true,
+        winblend = 0,
+        signcolumn = 'yes',
+      },
+      keymaps = {
+        ['<C-s>'] = false,
+        ['q'] = 'actions.close',
+        ['h'] = 'actions.parent',
+        ['l'] = 'actions.select',
+        ['s'] = 'actions.close',
+        ['Y'] = 'actions.yank_entry',
+        ['<C-p>'] = {
+          callback = function()
+            local oil = require('oil')
+            -- Function to find if preview window is open
+            local function find_preview_window()
+              for _, winid in ipairs(vim.api.nvim_tabpage_list_wins(0)) do
+                if vim.api.nvim_win_is_valid(winid) and vim.wo[winid].previewwindow and vim.w[winid]['oil_preview'] then
+                  return winid
+                end
+              end
+              return nil
+            end
+
+            local preview_winid = find_preview_window()
+            if preview_winid then
+              -- Close the preview window if it's open
+              vim.api.nvim_win_close(preview_winid, true)
+            else
+              -- Open preview if it's not open
+              oil.open_preview({ vertical = true, split = 'botright' }, function(err)
+                if not err then vim.cmd('vertical resize 40') end
+              end)
+            end
+          end,
+          desc = 'Toggle Oil preview',
         },
-        lsp_interop = {
-          enable = true,
-          border = 'rounded',
-          peek_definition_code = {
-            ['<leader>dp'] = '@function.outer',
+        ['gw'] = {
+          desc = 'Go to working directory',
+          callback = function() require('oil').open(vim.fn.getcwd()) end,
+        },
+        ['gd'] = {
+          desc = 'Toggle file detail view',
+          callback = function()
+            detail = not detail
+            if detail then
+              require('oil').set_columns({ 'icon', 'permissions', 'size', 'mtime' })
+            else
+              require('oil').set_columns({ 'icon' })
+            end
+          end,
+        },
+        ['gf'] = {
+          function()
+            require('telescope.builtin').find_files({
+              cwd = require('oil').get_current_dir(),
+            })
+          end,
+          mode = 'n',
+          nowait = true,
+          desc = 'Find files in the current directory with Telescope',
+        },
+        ['.'] = {
+          'actions.open_cmdline',
+          opts = {
+            shorten_path = true,
+            -- modify = ":h",
           },
+          desc = 'Open the command line with the current directory as an argument',
         },
       },
     }
-    require('nvim-treesitter.configs').setup(opts)
+    require('oil').setup(opts)
   end,
 })
+--: }}}
+
+--: Lazy load Codecompanion {{{
+p({
+  src = 'olimorris/codecompanion.nvim',
+  cmd = { 'CodeCompanion', 'CodeCompanionChat', 'CodeCompanionActions' },
+  keys = {
+    { { 'n', 'v' }, 'go', '<cmd>CodeCompanionChat Toggle<cr>', { desc = 'CodeCompanion Toggle' } },
+    { { 'n', 'v' }, '<leader>jc', '<cmd>CodeCompanionChat Toggle<cr>', { desc = 'CodeCompanion Toggle' } },
+    { { 'n', 'v' }, '<leader>jl', '<cmd>CodeCompanion<cr>', { desc = 'CodeCompanion Inline Assistant' } },
+    { { 'n', 'v' }, '<leader>jA', '<cmd>CodeCompanionActions<cr>', { desc = 'CodeCompanion Actions' } },
+    { 'v', '<leader>js', '<cmd>CodeCompanionChat Add<cr>', { desc = 'CodeCompanion Add Selection' } },
+  },
+  dependencies = {
+    'nvim-lua/plenary.nvim',
+    'nvim-treesitter/nvim-treesitter',
+  },
+  config = function()
+    local opts = {
+      display = {
+        chat = {
+          window = {
+            layout = 'vertical', -- use 'buffer' for full buffer
+            height = 0.6,
+            width = 0.45,
+            position = nil, -- left|right|top|bottom
+          },
+        },
+      },
+      strategies = {
+        chat = {
+          adapter = 'copilot',
+          keymaps = { change_adapter = { modes = { n = 'gA' } } },
+        },
+        inline = { adapter = 'copilot' },
+      },
+      adapters = {
+        copilot = function()
+          return require('codecompanion.adapters').extend('copilot', {
+            schema = { model = { default = 'claude-sonnet-4' } },
+          })
+        end,
+      },
+    }
+    require('codecompanion').setup(opts)
+  end,
+})
+--}}}
+
+--: Lazy load misc plugins {{{
+p({ src = 'nvim-lua/plenary.nvim' })
+
 p({
   src = 'michaeljsmith/vim-indent-object',
   event = { 'BufReadPost', 'BufNewFile' },
+})
+
+p({
+  src = 'junegunn/vim-easy-align',
+  cmd = 'EasyAlign',
 })
 --}}}
