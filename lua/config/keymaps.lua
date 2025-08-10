@@ -201,6 +201,7 @@ keyset('n', ',f', function()
   local peek = require('utils').lazy_require('peek')
   peek().peek_symbols('Function')
 end, { desc = 'Peek Functions' })
+keyset('n', '<leader>nn', require('zk').new_note, { desc = 'ZK - Create New Note' })
 
 -- Terminal mappigs
 keyset('t', '<Esc><Esc>', '<C-\\><C-n>', { desc = 'Enter normal mode' })
