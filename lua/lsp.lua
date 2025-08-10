@@ -4,7 +4,6 @@
 vim.lsp.enable({
   'gopls',
   'lua_ls',
-  -- 'marksman',
   'pyright',
   'ruff',
   'rust_analyzer',
