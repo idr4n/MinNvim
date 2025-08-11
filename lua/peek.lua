@@ -738,6 +738,22 @@ local function setup_symbols_keymaps(
 )
   local original_bufnr = search_state.original_bufnr
 
+  -- Create close function for both popups with proper cleanup
+  local close_all_popups = function()
+    -- Clear all highlights
+    if search_state.current_highlighted_line() then clear_line_highlight(original_bufnr, 'symbol_highlight') end
+    if search_state.current_popup_highlight() then clear_selection_highlight(symbols_bufnr, 'symbol_selection') end
+    -- Close windows
+    if vim.api.nvim_win_is_valid(search_win) then vim.api.nvim_win_close(search_win, true) end
+    if vim.api.nvim_win_is_valid(symbols_win) then vim.api.nvim_win_close(symbols_win, true) end
+    -- Ensure we're in normal mode when returning to original buffer
+    vim.schedule(function()
+      local line, col = unpack(cursor_pos)
+      pcall(vim.api.nvim_win_set_cursor, 0, { line, col + 1 })
+      vim.cmd('stopinsert')
+    end)
+  end
+
   -- Set up search input keymaps and autocmds
   vim.api.nvim_create_autocmd({ 'TextChanged', 'TextChangedI' }, {
     buffer = search_bufnr,
@@ -767,12 +783,7 @@ local function setup_symbols_keymaps(
     if current_selection > 0 and symbol_data[current_selection] then
       local item = symbol_data[current_selection]
       local line, col = item.lnum + 1, item.col
-      -- Clear all highlights before closing
-      if search_state.current_highlighted_line() then clear_line_highlight(original_bufnr, 'symbol_highlight') end
-      if search_state.current_popup_highlight() then clear_selection_highlight(symbols_bufnr, 'symbol_selection') end
-      -- Close windows
-      if vim.api.nvim_win_is_valid(search_win) then vim.api.nvim_win_close(search_win, true) end
-      if vim.api.nvim_win_is_valid(symbols_win) then vim.api.nvim_win_close(symbols_win, true) end
+      close_all_popups()
       if vim.api.nvim_win_is_valid(original_win) then
         vim.api.nvim_set_current_win(original_win)
         vim.api.nvim_win_set_cursor(original_win, { line, col })
@@ -781,21 +792,19 @@ local function setup_symbols_keymaps(
     end
   end, { buffer = search_bufnr, desc = 'Jump to symbol' })
 
-  -- Create close function for both popups with proper cleanup
-  local close_all_popups = function()
-    -- Clear all highlights
-    if search_state.current_highlighted_line() then clear_line_highlight(original_bufnr, 'symbol_highlight') end
-    if search_state.current_popup_highlight() then clear_selection_highlight(symbols_bufnr, 'symbol_selection') end
-    -- Close windows
-    if vim.api.nvim_win_is_valid(search_win) then vim.api.nvim_win_close(search_win, true) end
-    if vim.api.nvim_win_is_valid(symbols_win) then vim.api.nvim_win_close(symbols_win, true) end
-    -- Ensure we're in normal mode when returning to original buffer
-    vim.schedule(function()
-      local line, col = unpack(cursor_pos)
-      pcall(vim.api.nvim_win_set_cursor, 0, { line, col + 1 })
-      vim.cmd('stopinsert')
-    end)
-  end
+  -- Vertical split to jump to selected symbol
+  vim.keymap.set('i', '<c-v>', function()
+    local current_selection = search_state.current_selection()
+    if current_selection > 0 and symbol_data[current_selection] then
+      close_all_popups()
+      if vim.api.nvim_win_is_valid(original_win) then
+        vim.cmd('vsplit')
+        local new_win = vim.api.nvim_get_current_win()
+        vim.api.nvim_set_current_win(original_win)
+        vim.schedule(function() vim.api.nvim_set_current_win(new_win) end)
+      end
+    end
+  end, { buffer = search_bufnr, desc = 'Jump to symbol in vertical split' })
 
   -- Set up Esc keymaps for both buffers
   for _, buf in ipairs({ search_bufnr, symbols_bufnr }) do
