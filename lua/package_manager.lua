@@ -196,31 +196,27 @@ function M.lazyload_on_keys(spec)
       end, { desc = '[Lazy] Load ' .. spec.name })
     elseif type(key) == 'table' then
       -- Advanced format: { modes, lhs, rhs, opts }
-      local modes = key[1] or 'n'
+      local mode = key[1] or 'n'
       local lhs = key[2]
       local rhs = key[3]
       local opts = key[4] or {}
 
-      -- Create one-shot lazy loading wrapper
       local lazy_rhs = function()
         M.load_plugin(spec)
-        if type(rhs) == 'string' then
-          -- Parse string commands
-          if rhs:lower():match('^<cmd>.*<cr>$') then
-            local cmd = rhs:match('^<[Cc][Mm][Dd]>(.+)<[Cc][Rr]>$')
-            vim.cmd(cmd)
-          elseif rhs:match('^:.*<cr>?$') then
-            local cmd = rhs:match('^:(.+)<cr>?$')
-            vim.cmd(cmd)
-          else
-            vim.api.nvim_feedkeys(rhs, 'n', false)
+        if type(rhs) == 'function' then
+          local result = rhs()
+          if result and opts.expr then
+            vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(result, true, true, true), 'm', false)
           end
-        elseif type(rhs) == 'function' then
-          rhs()
+        elseif rhs:lower():match('^<cmd>.*<cr>$') then
+          local cmd = rhs:match('^<[Cc][Mm][Dd]>(.+)<[Cc][Rr]>$')
+          vim.cmd(cmd)
+        else
+          vim.api.nvim_feedkeys(vim.api.nvim_replace_termcodes(rhs, true, true, true), 'm', false)
         end
       end
 
-      vim.keymap.set(modes, lhs, lazy_rhs, opts)
+      vim.keymap.set(mode, lhs, lazy_rhs, opts)
     end
   end
 end
