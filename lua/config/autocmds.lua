@@ -93,6 +93,20 @@ aucmd('FileChangedShellPost', {
   end,
 })
 
+-- Setup hashtag syntax highlighting specifically for markdown files
+aucmd({ 'BufEnter', 'BufWinEnter', 'FileType' }, {
+  group = augroup('MarkdownHashTag'),
+  pattern = '*.md',
+  callback = function()
+    if vim.bo.filetype == 'markdown' then
+      pcall(function() vim.api.nvim_set_hl(0, 'HashTag', { bg = '#272538', fg = '#9D7CD8', bold = true }) end)
+
+      -- Pattern that only matches standalone hashtags. This avoids things like variable#property
+      vim.cmd([[syntax match HashTag /\(^\|\s\)\@<=#\w\+/ contains=@NoSpell containedin=ALL]])
+    end
+  end,
+})
+
 -- LAZY LOADING
 
 -- Lazy load statusline
