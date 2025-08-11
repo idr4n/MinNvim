@@ -194,7 +194,7 @@ p({
 --: Lazy load blink-cmp {{{
 p({
   src = 'saghen/blink.cmp',
-  event = 'InsertEnter',
+  event = { 'InsertEnter', 'CmdlineEnter' },
   -- version = 'v1.6.0',
   build = 'cargo build --release',
   config = function()
@@ -460,6 +460,29 @@ p({
 })
 --}}}
 
+--: Lazy load nvim-snippy {{{
+p({
+  src = 'dcampos/nvim-snippy',
+  event = 'InsertEnter',
+  keys = {
+    {
+      { 'i', 's' },
+      '<C-J>',
+      function() return require('snippy').can_expand_or_advance() and '<plug>(snippy-expand-or-advance)' or '<tab>' end,
+      { expr = true, desc = 'Snippy - Next' },
+    },
+    {
+      { 'i', 's' },
+      '<C-K>',
+      function() return require('snippy').can_jump(-1) and '<plug>(snippy-previous)' or '<s-tab>' end,
+      { expr = true, desc = 'Snippy - Previous' },
+    },
+    { 'x', '<Tab>', '<plug>(snippy-cut-text)' },
+    { 'n', 'g<Tab>', '<plug>(snippy-cut-text)' },
+  },
+})
+--: }}}
+
 --: Lazy load misc plugins {{{
 p({ src = 'nvim-lua/plenary.nvim' })
 
@@ -471,5 +494,10 @@ p({
 p({
   src = 'junegunn/vim-easy-align',
   cmd = 'EasyAlign',
+  keys = {
+    { 'x', 'ga', '<Plug>(EasyAlign)', { desc = 'EasyAlign' } },
+    { 'x', '<leader>pt', ':EasyAlign *|<cr>', { desc = 'Align Markdown Table' } },
+    { 'v', '<leader>pa', ':EasyAlign = l5', { desc = 'EasyAlign' } },
+  },
 })
 --}}}
