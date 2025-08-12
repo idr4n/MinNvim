@@ -739,19 +739,24 @@ local function setup_symbols_keymaps(
   local original_bufnr = search_state.original_bufnr
 
   -- Create close function for both popups with proper cleanup
-  local close_all_popups = function()
+  local close_all_popups = function(restore_cursor)
+    restore_cursor = restore_cursor == nil and true or restore_cursor -- default to true
     -- Clear all highlights
     if search_state.current_highlighted_line() then clear_line_highlight(original_bufnr, 'symbol_highlight') end
     if search_state.current_popup_highlight() then clear_selection_highlight(symbols_bufnr, 'symbol_selection') end
     -- Close windows
     if vim.api.nvim_win_is_valid(search_win) then vim.api.nvim_win_close(search_win, true) end
     if vim.api.nvim_win_is_valid(symbols_win) then vim.api.nvim_win_close(symbols_win, true) end
-    -- Ensure we're in normal mode when returning to original buffer
-    vim.schedule(function()
-      local line, col = unpack(cursor_pos)
-      pcall(vim.api.nvim_win_set_cursor, 0, { line, col + 1 })
-      vim.cmd('stopinsert')
-    end)
+    -- Only restore cursor position if requested
+    if restore_cursor then
+      vim.schedule(function()
+        local line, col = unpack(cursor_pos)
+        pcall(vim.api.nvim_win_set_cursor, 0, { line, col + 1 })
+        vim.cmd('stopinsert')
+      end)
+    else
+      vim.schedule(function() vim.cmd('stopinsert') end)
+    end
   end
 
   -- Set up search input keymaps and autocmds
@@ -783,7 +788,7 @@ local function setup_symbols_keymaps(
     if current_selection > 0 and symbol_data[current_selection] then
       local item = symbol_data[current_selection]
       local line, col = item.lnum + 1, item.col
-      close_all_popups()
+      close_all_popups(false) -- Don't restore cursor position
       if vim.api.nvim_win_is_valid(original_win) then
         vim.api.nvim_set_current_win(original_win)
         vim.api.nvim_win_set_cursor(original_win, { line, col })
