@@ -17,6 +17,7 @@ vim.opt.path:append('**')
 vim.opt.linebreak = true
 vim.opt.list = true
 vim.opt.scrolloff = 5
+vim.opt.sessionoptions = { 'buffers', 'curdir', 'tabpages', 'winsize', 'help', 'globals', 'skiprtp', 'folds' }
 vim.opt.shiftwidth = 2
 vim.opt.showbreak = '↪ '
 vim.opt.signcolumn = 'yes:2'

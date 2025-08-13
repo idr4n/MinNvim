@@ -10,5 +10,6 @@ My Neovim configuration aimed at being as minimal as possible without sacrificin
 - Only ~15-20 plugins installed. The aim is to use Neovim's native functionality as much as possible without relying on many third-party dependencies. Custom built-in functionality is preferred over installing a plugin.
 - Native LSP management with `vim.lsp.enable`
 - Native plugin management around `vim.pack.add`
+- Native sessions management with `mksession`
 - Minimal monochromatic colorscheme
 
