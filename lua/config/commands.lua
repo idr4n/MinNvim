@@ -404,7 +404,7 @@ local function extcmd(cmd, qf, close_qf, novsplit)
   if qf then scratch_to_quickfix(close_qf) end
 end
 
-vim.keymap.set('n', '<leader>ss', function()
+vim.keymap.set('n', '<leader>sb', function()
   vim.ui.input({ prompt = '  > ' }, function(pat)
     if pat then extcmd("grep -iEn '" .. pat .. "' " .. vim.fn.shellescape(vim.api.nvim_buf_get_name(0)), false) end
   end)

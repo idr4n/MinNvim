@@ -54,7 +54,9 @@ function M.cursorMoveAround()
 end
 
 -- Git diff function
-function M.git_diff()
+function M.git_diff(commit_ref)
+  commit_ref = commit_ref or 0 -- Default to HEAD (0 commits back)
+
   local current_file = vim.fn.expand('%')
   if current_file == '' then
     print('No file name')
@@ -71,10 +73,18 @@ function M.git_diff()
   local absolute_file = vim.fn.expand('%:p')
   local relative_file = vim.fn.fnamemodify(absolute_file, ':s?' .. git_root .. '/??')
 
-  -- Create vertical split with git HEAD version
+  -- Build commit reference - handle both numbers and commit hashes
+  local git_ref
+  if type(commit_ref) == 'number' then
+    git_ref = commit_ref == 0 and 'HEAD' or ('HEAD~' .. commit_ref)
+  else
+    git_ref = commit_ref -- Use the commit hash directly
+  end
+
+  -- Create vertical split with git commit version
   vim.cmd('vert new')
   vim.cmd('set bt=nofile')
-  vim.cmd('r !git show HEAD:' .. vim.fn.shellescape(relative_file))
+  vim.cmd('r !git show ' .. git_ref .. ':' .. vim.fn.shellescape(relative_file))
   vim.cmd('0d_')
   vim.cmd('diffthis')
   vim.cmd('wincmd p')
@@ -221,8 +231,17 @@ function M.show_startup_screen(custom_message, show_loading)
   vim.o.laststatus = 0 -- Hide statusline
   vim.o.ruler = false -- Hide ruler
 
+  -- Mappings
+  local bufnr = vim.api.nvim_get_current_buf()
+  vim.keymap.set('n', 's', require('sessions').load_session, {
+    buffer = bufnr,
+    noremap = true,
+    silent = true,
+  })
+  vim.keymap.set('n', 'q', ':qa<cr>', { buffer = bufnr, noremap = true, silent = true })
+
   -- Store buffer ID for later reference
-  vim.g.startup_buffer_id = vim.api.nvim_get_current_buf()
+  vim.g.startup_buffer_id = bufnr
 end
 
 -- function used to retrieve buffers (source: heirline's cookbook.md)

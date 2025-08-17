@@ -38,8 +38,38 @@ keyset('n', 'k', 'gk')
 keyset({ 'n', 'i' }, '<C-S>', '<cmd>w<CR><esc>', { desc = 'Save file' })
 keyset('n', '<Leader>w', '<cmd>noa w<CR>', { desc = 'Save file no formatting' })
 keyset('n', '<leader>qq', ':qa<CR>', { desc = 'Quit all' })
-keyset('n', '<leader>x', ':bdelete<CR>', { desc = 'Delete Buffer and Window' })
 keyset('n', ',A', 'ggVG<c-$>', { desc = 'Select All' })
+keyset('n', '<leader>x', function()
+  local bufnr = vim.api.nvim_get_current_buf()
+  -- Get all listed buffers (excluding current bufnr)
+  local alt_bufs = {}
+  for _, b in ipairs(vim.fn.getbufinfo({ buflisted = 1 })) do
+    if b.bufnr ~= bufnr then table.insert(alt_bufs, b.bufnr) end
+  end
+  -- If this is the only buffer, just delete it (Neovim will create empty buffer)
+  if #alt_bufs == 0 then
+    vim.cmd('bdelete ' .. bufnr)
+    return
+  end
+  -- Multiple buffers exist - do alternate buffer switching
+  local alt_bufnr = vim.fn.bufnr('#')
+  local use_alt = false
+  if alt_bufnr ~= -1 and alt_bufnr ~= bufnr then
+    for _, b in ipairs(alt_bufs) do
+      if b == alt_bufnr then
+        use_alt = true
+        break
+      end
+    end
+  end
+  if not use_alt then alt_bufnr = alt_bufs[1] end
+  -- Find all windows showing the target buffer and switch them
+  for _, win in ipairs(vim.api.nvim_list_wins()) do
+    if vim.api.nvim_win_get_buf(win) == bufnr then vim.api.nvim_win_set_buf(win, alt_bufnr) end
+  end
+  -- Delete the buffer
+  vim.cmd('bdelete ' .. bufnr)
+end, { desc = 'Close (delete) Buffer' })
 keyset(
   'n',
   '<leader>bo',
@@ -48,10 +78,17 @@ keyset(
 )
 
 -- Comment mappings
-keyset('n', '<C-c>', 'gcc', { remap = true, desc = 'Comment line' })
-keyset('x', '<C-c>', 'gc', { remap = true, desc = 'Comment select' })
-keyset('n', 'gcy', 'gcc:t.<cr>gcc', { remap = true, noremap = false, desc = 'Duplicate-comment line' })
-keyset('v', 'gy', ":t'><cr>gvgcgv<esc>", { remap = true, desc = 'Duplicate and comment' })
+keyset(
+  'n',
+  '<C-c>',
+  function()
+    return vim.v.count == 0 and '<Plug>(comment_toggle_linewise_current)' or '<Plug>(comment_toggle_linewise_count)'
+  end,
+  { expr = true, desc = 'Comment line' }
+)
+keyset('n', '<C-b>', '<Plug>(comment_toggle_blockwise_current)')
+keyset('x', '<C-c>', '<Plug>(comment_toggle_linewise_visual)', { desc = 'Comment line(s)' })
+keyset('x', '<C-b>', '<Plug>(comment_toggle_blockwise_visual)', { desc = 'Comment block' })
 
 -- Buffer navigation
 keyset('n', '<S-l>', ':bnext<CR>')
@@ -136,6 +173,7 @@ end, { desc = 'Smart window cycle' })
 keyset('n', 'z0', ':set foldlevel=0<cr>', { desc = 'Fold level 0' })
 keyset('n', 'z1', ':set foldlevel=1<cr>', { desc = 'Fold level 1' })
 keyset('n', 'z2', ':set foldlevel=2<cr>', { desc = 'Fold level 2' })
+keyset('n', 'z3', ':set foldlevel=3<cr>', { desc = 'Fold level 3' })
 keyset('n', 'z9', ':set foldlevel=99<cr>', { desc = 'Fold level 99' })
 keyset('n', '<leader>fi', ':set foldmethod=indent<cr>', { desc = 'Set fold indent' })
 keyset('n', '<leader>fm', ':set foldmethod=marker<cr>', { desc = 'Set fold marker' })

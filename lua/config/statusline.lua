@@ -2,6 +2,30 @@
 
 local M = {}
 
+local get_opt = vim.api.nvim_get_option_value
+
+local nonprog_modes = {
+  ['markdown'] = true,
+  ['org'] = true,
+  ['text'] = true,
+}
+
+local group_number = function(num, sep)
+  if num < 999 then
+    return tostring(num)
+  else
+    num = tostring(num)
+    return num:reverse():gsub('(%d%d%d)', '%1' .. sep):reverse():gsub('^,', '')
+  end
+end
+
+local function get_vlinecount_str()
+  local raw_count = vim.fn.line('.') - vim.fn.line('v')
+  raw_count = raw_count < 0 and raw_count - 1 or raw_count + 1
+
+  return group_number(math.abs(raw_count), ',')
+end
+
 ---source: modified from https://github.com/MariaSolOs/dotfiles
 ---Keeps track of the highlight groups already created.
 ---@type table<string, boolean>
@@ -196,13 +220,67 @@ function M.git_status_simple()
   return total_changes > 0 and added .. changed .. removed .. ' ' or ''
 end
 
+---Get wordcount for current buffer or visual selection
+--- @return string word count
+function M.lines_count_widget()
+  local ft = get_opt('filetype', {})
+  local lines = group_number(vim.api.nvim_buf_line_count(0), ',')
+
+  local wc_table = vim.fn.wordcount()
+
+  -- For source code: return icon and line count
+  if not nonprog_modes[ft] then
+    if not wc_table.visual_words or not wc_table.visual_chars then
+      return table.concat({ hl_str('DiagnosticInfo', '≡'), ' ', lines, ' lines' })
+    else
+      return table.concat({
+        hl_str('DiagnosticInfo', '‹›'),
+        ' ',
+        get_vlinecount_str(),
+        ' lines  ',
+        group_number(wc_table.visual_chars, ','),
+        ' chars',
+      })
+    end
+  end
+
+  if not wc_table.visual_words or not wc_table.visual_chars then
+    -- Normal mode word count and file info
+    return table.concat({
+      hl_str('DiagnosticInfo', '≡'),
+      ' ',
+      lines,
+      ' lines  ',
+      group_number(wc_table.words, ','),
+      ' words ',
+    })
+  else
+    -- Visual selection mode: line count, word count, and char count
+    return table.concat({
+      hl_str('DiagnosticInfo', '‹›'),
+      ' ',
+      get_vlinecount_str(),
+      ' lines  ',
+      group_number(wc_table.visual_words, ','),
+      ' words  ',
+      group_number(wc_table.visual_chars, ','),
+      ' chars',
+    })
+  end
+end
+
 ---Generate the complete statusline string
 ---@return string The formatted statusline
 function M.StatusLine()
   local components = {
     M.fileinfo(),
     '%=',
+    M.lines_count_widget(),
+    M.padding(),
     M.get_position(),
+    M.padding(2),
+    vim.bo.filetype:upper(),
+    M.padding(2),
     M.scrollbar(),
     M.lsp_diagnostics({ show_count = false }),
     M.git_status_simple(),

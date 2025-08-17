@@ -6,6 +6,7 @@ vim.opt.autowrite = true
 vim.opt.backup = false
 vim.opt.breakindent = true
 vim.opt.completeopt = { 'menu', 'menuone', 'noselect', 'fuzzy', 'popup' }
+vim.opt.cursorline = false
 vim.opt.expandtab = true
 vim.opt.foldmethod = 'indent'
 vim.opt.foldlevel = 99
@@ -30,6 +31,10 @@ vim.opt.tabstop = 2
 vim.opt.updatetime = 500
 vim.opt.wrap = false
 vim.opt.writebackup = false
+
+-- Line numbers
+vim.opt.number = false
+vim.opt.relativenumber = false
 
 -- List chars
 vim.opt.listchars = { trail = '·', tab = '  ', nbsp = '␣' }

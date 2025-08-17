@@ -15,7 +15,7 @@ vim.lsp.enable({
 
 --: Diagnostics {{{
 -- Disabled by default
-vim.diagnostic.enable(false)
+-- vim.diagnostic.enable(false)
 
 vim.diagnostic.config({
   update_in_insert = false,
@@ -38,10 +38,11 @@ vim.api.nvim_create_autocmd('LspAttach', {
   group = group,
   desc = 'Configure LSP keymaps',
   callback = function(args)
-    -- Disable semantic_tokens
-    vim.lsp.semantic_tokens.enable(false)
+    -- Disable semantic tokens for this client
+    local client = vim.lsp.get_client_by_id(args.data.client_id)
+    if client then client.server_capabilities.semanticTokensProvider = nil end
 
-    vim.keymap.set({ 'n', 'v' }, '<leader>ff', vim.lsp.buf.format, { buffer = args.buf, desc = 'Format buffer' })
+    vim.keymap.set({ 'n', 'v' }, '<leader>fb', vim.lsp.buf.format, { buffer = args.buf, desc = 'Format buffer' })
     vim.keymap.set('n', 'gd', vim.lsp.buf.definition, { buffer = args.buf, desc = 'Go to definition' })
     vim.keymap.set('i', '<c-q>', vim.lsp.buf.signature_help, { buffer = args.buf, desc = 'Signature help' })
     vim.keymap.set(
@@ -64,31 +65,6 @@ vim.api.nvim_create_autocmd('LspAttach', {
       end,
       { buffer = args.buf, desc = 'Toggle inlay hints' }
     )
-
-    local client = vim.lsp.get_client_by_id(args.data.client_id)
-
-    -- Manual document highlighting toggle with ,s
-    if client and client:supports_method(vim.lsp.protocol.Methods.textDocument_documentHighlight, args.buf) then
-      local is_highlighted = false
-
-      local function toggle_highlight()
-        if is_highlighted then
-          vim.lsp.buf.clear_references()
-          is_highlighted = false
-        else
-          vim.lsp.buf.document_highlight()
-          is_highlighted = true
-          -- Auto-clear after 4 seconds
-          vim.defer_fn(function()
-            if is_highlighted then
-              vim.lsp.buf.clear_references()
-              is_highlighted = false
-            end
-          end, 4000)
-        end
-      end
-      vim.keymap.set('n', ',s', toggle_highlight, { buffer = args.buf, desc = 'Toggle symbol highlight' })
-    end
   end,
 })
 --: }}}

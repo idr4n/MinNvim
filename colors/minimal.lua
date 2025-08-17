@@ -6,7 +6,7 @@ vim.g.colors_name = 'minimal'
 
 local settings = {
   comments = { italic = false },
-  functions = { bold = false },
+  functions = { bold = true },
   conditional = { bold = false },
   loops = { bold = false },
   keywords = { bold = false },
@@ -19,7 +19,10 @@ local colors = {
   fg_hl = '#B48004',
   comment = '#7D7160',
   string = '#89B482',
-  number = '#FB4934',
+  -- number = '#FB4934',
+  number = '#9D7CD8',
+  highlight = '#323232',
+  Illuminate = '#353535',
   statusline_bg = '#303030',
   statusline_fg = '#D4BE98',
   statusline_nc = '#A89983',
@@ -27,6 +30,7 @@ local colors = {
   red = '#EA6962',
   yellow = '#D8A658',
   blue = '#7CAEA3',
+  purple = '#9D7CD8',
   green = '#A8B765',
   cyan = '#B3F6C0',
   magenta = '#FF87D7',
@@ -101,6 +105,8 @@ hl('Delimiter', { fg = colors.fg })
 hl('@variable', { fg = colors.fg })
 hl('@keyword.conditional', { fg = colors.fg_hl, bold = settings.conditional.bold or false })
 hl('@keyword.repeat', { fg = colors.fg_hl, bold = settings.loops.bold or false })
+hl('@function.call', { fg = colors.fg, bold = settings.functions.bold or false })
+hl('@keyword.function', { fg = colors.fg, bold = settings.functions.bold or false })
 
 -- -- UI highlight groups
 -- hl("Visual", { fg = colors.fg, bg = colors.statusline_bg })
@@ -121,7 +127,7 @@ hl('CurSearch', { fg = colors.bg, bg = colors.red })
 -- hl("SignColumn", { fg = colors.fg, bg = colors.bg })
 -- hl("MatchParen", { fg = colors.fg, bg = colors.statusline_bg })
 -- hl("LineNr", { fg = colors.statusline_nc })
--- hl("NonText", { fg = colors.statusline_nc })
+hl('NonText', { fg = colors.highlight })
 -- hl("VertSplit", { fg = colors.statusline_bg })
 hl('WinSeparator', { fg = colors.statusline_bg })
 hl('Folded', { fg = colors.comment, bg = colors.statusline_bg })
@@ -146,11 +152,6 @@ hl('DiffAdd', { fg = colors.diff_add, bg = '#293A2A' })
 hl('DiffChange', { fg = colors.diff_change, bg = '#3A3A29' })
 hl('DiffDelete', { fg = colors.diff_delete, bg = '#3A292A' })
 hl('DiffText', { fg = colors.diff_change, bg = '#4A4A29' })
-
--- mini.diff
-hl('MiniDiffSignAdd', { fg = colors.diff_add })
-hl('MiniDiffSignChange', { fg = colors.diff_change })
-hl('MiniDiffSignDelete', { fg = colors.diff_delete })
 
 -- -- LSP and diagnostic groups
 hl('DiagnosticError', { fg = colors.red })
@@ -188,6 +189,7 @@ hl('@markup.heading.5.markdown', { fg = colors.green })
 hl('@markup.heading.6.markdown', { fg = colors.green })
 hl('@markup.link.url.markdown_inline', { fg = colors.green })
 hl('@markup.link.label.markdown_inline', { fg = colors.magenta })
+hl('@markup.raw.markdown_inline', { fg = colors.magenta })
 
 -- Plugins
 
@@ -196,3 +198,24 @@ hl('MiniPickNormal', { bg = colors.bg })
 hl('MiniPickBorder', { bg = colors.bg })
 hl('MiniPickBorder', { bg = colors.bg })
 hl('MiniPickMatchRanges', { fg = colors.magenta })
+
+-- mini.diff
+hl('MiniDiffSignAdd', { fg = colors.diff_add })
+hl('MiniDiffSignChange', { fg = colors.diff_change })
+hl('MiniDiffSignDelete', { fg = colors.diff_delete })
+
+-- Gitsigns
+hl('GitSignsAdd', { fg = colors.diff_add })
+hl('GitSignsChange', { fg = colors.diff_change })
+hl('GitSignsDelete', { fg = colors.diff_delete })
+
+-- Illuminate
+hl('IlluminatedWordText', { bg = colors.Illuminate })
+hl('IlluminatedWordRead', { bg = colors.Illuminate })
+hl('IlluminatedWordWrite', { bg = colors.Illuminate })
+
+-- NvimTree
+hl('NvimTreeIndentMarker', { fg = colors.highlight })
+hl('NvimTreeFolderIcon', { fg = colors.purple })
+hl('NvimTreeFolderArrowOpen', { fg = colors.purple })
+hl('NvimTreeFolderArrowClosed', { fg = colors.purple })
