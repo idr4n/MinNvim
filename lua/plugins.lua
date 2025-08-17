@@ -6,14 +6,37 @@ local p = manager.add
 --: Lazy load treesitter {{{
 p({
   src = 'nvim-treesitter/nvim-treesitter',
+  build = ':TSUpdate',
   event = { 'BufReadPost', 'BufNewFile', 'BufWritePre' },
+  dependencies = { 'JoosepAlviste/nvim-ts-context-commentstring' },
   config = function()
-    vim.pack.add({ 'nvim-treesitter/nvim-treesitter' })
     require('nvim-treesitter.configs').setup({
-      ensure_installed = { 'lua', 'vim', 'vimdoc', 'query', 'go', 'markdown', 'rust', 'python', 'markdown_inline' },
+      ensure_installed = {
+        'bash',
+        'cpp',
+        'css',
+        'go',
+        'html',
+        'json',
+        'latex',
+        'lua',
+        'markdown',
+        'markdown_inline',
+        'python',
+        'query',
+        'rust',
+        'scss',
+        'tsx',
+        'typescript',
+        'typst',
+        'vim',
+        'vimdoc',
+      },
       highlight = { enable = true, additional_vim_regex_highlighting = false },
       indent = { enable = true },
     })
+    require('ts_context_commentstring').setup({})
+    vim.g.skip_ts_context_commentstring_module = true
   end,
 })
 
@@ -92,7 +115,9 @@ p({
   config = function()
     local minidiff = require('mini.diff')
     minidiff.setup({
-      view = { signs = { add = ' ┃', change = ' ┃', delete = ' _' } },
+      view = {
+        signs = { add = ' ┃', change = ' ┋', delete = ' _' },
+      },
       mappings = {
         apply = '<leader>hs',
         reset = '<leader>hS',
@@ -186,8 +211,10 @@ p({
       exclude_filetypes = {},
       exclude_buftypes = {},
     })
-    vim.keymap.set('n', ',c', '<cmd>HighlightColors Toggle<cr>', { silent = true, desc = 'Toggle colorizer' })
   end,
+  keys = {
+    { 'n', ',c', '<cmd>HighlightColors Toggle<cr>', { silent = true, desc = 'Toggle colorizer' } },
+  },
 })
 --: }}}
 
@@ -249,6 +276,333 @@ p({
   end,
 })
 --: }}}
+
+--: Lazy load Telescope {{{
+-- Telescope dependencies
+p({ src = 'nvim-telescope/telescope-fzf-native.nvim', build = 'make' })
+p({ src = 'nvim-lua/popup.nvim' })
+p({ src = 'nvim-telescope/telescope-ui-select.nvim' })
+
+p({
+  src = 'nvim-telescope/telescope.nvim',
+  cmd = 'Telescope',
+  dependencies = {
+    'nvim-lua/popup.nvim',
+    'nvim-lua/plenary.nvim',
+    'nvim-telescope/telescope-ui-select.nvim',
+    'nvim-telescope/telescope-fzf-native.nvim',
+  },
+  keys = {
+    {
+      'n',
+      '<leader>ff',
+      function() require('telescope.builtin').find_files() end,
+      { noremap = true, silent = true, desc = 'Telescope-find_files' },
+    },
+    {
+      'n',
+      '<leader>ot',
+      '<cmd>Telescope resume<cr>',
+      { noremap = true, silent = true, desc = 'Telescope Resume' },
+    },
+    { 'n', '<leader>sh', '<cmd>Telescope highlights<cr>', { noremap = true, silent = true, desc = 'Highlights' } },
+    { 'n', '<leader>sk', '<cmd>Telescope keymaps<cr>', { noremap = true, silent = true, desc = 'Keymaps' } },
+    {
+      'n',
+      '<leader>gs',
+      '<cmd>Telescope git_status initial_mode=normal<cr>',
+      { noremap = true, silent = true, desc = 'Git Status' },
+    },
+    { 'n', '<leader>gb', '<cmd>Telescope git_bcommits<cr>', { noremap = true, silent = true, desc = 'Git BCommits' } },
+    { 'n', '<leader>ot', '<cmd>Telescope live_grep<cr>', { noremap = true, silent = true, desc = 'Telescope Resume' } },
+    { 'n', '<leader>r', '<cmd>Telescope live_grep<cr>', { noremap = true, silent = true, desc = 'Live Grep' } },
+    {
+      'v',
+      '<leader>r',
+      function()
+        local text = vim.getVisualSelection()
+        require('telescope.builtin').live_grep({ default_text = text })
+      end,
+      { noremap = true, silent = true, desc = 'Live Grep' },
+    },
+    {
+      'n',
+      's',
+      function()
+        require('telescope.builtin').buffers(
+          dropdown_theme({ initial_mode = 'normal', sort_lastused = false, select_current = true })
+        )
+      end,
+      { noremap = true, silent = true, desc = 'Switch buffers' },
+    },
+    { 'n', '<leader>sh', '<cmd>Telescope help_tags<cr>', { noremap = true, silent = true, desc = 'Help pages' } },
+    {
+      'v',
+      '<leader>sh',
+      function()
+        local text = vim.getVisualSelection()
+        require('telescope.builtin').help_tags({ default_text = text })
+      end,
+      { noremap = true, silent = true, desc = 'Help pages with selection' },
+    },
+  },
+  config = function()
+    _G.dropdown_theme = function(opts)
+      opts = vim.tbl_deep_extend('force', {
+        disable_devicons = false,
+        previewer = false,
+        layout_config = {
+          width = function(_, max_columns, _) return math.min(math.floor(max_columns * 0.8), 92) end,
+          height = function(_, _, max_lines) return math.min(math.floor(max_lines * 0.8), 17) end,
+        },
+      }, opts or {})
+      return require('telescope.themes').get_dropdown(opts)
+    end
+
+    local opts = function()
+      local actions = require('telescope.actions')
+      return {
+        defaults = {
+          file_ignore_patterns = {
+            'node_modules',
+            '.DS_Store',
+          },
+          path_display = { 'filename_first' },
+          prompt_prefix = '  ',
+          selection_caret = '• ',
+          results_title = false,
+          preview = {
+            hide_on_startup = false,
+          },
+          winblend = 0,
+          sorting_strategy = 'descending',
+          layout_strategy = 'flex',
+          layout_config = {
+            preview_cutoff = 120,
+            width = 0.87,
+            height = 0.80,
+            flex = {
+              flip_columns = 120,
+            },
+            vertical = {
+              preview_cutoff = 40,
+              prompt_position = 'bottom',
+              preview_height = 0.4,
+            },
+            horizontal = {
+              prompt_position = 'bottom',
+              preview_width = 0.50,
+            },
+          },
+          mappings = {
+            i = {
+              ['jk'] = { '<esc>', type = 'command' },
+              ['<C-j>'] = actions.move_selection_next,
+              ['<C-k>'] = actions.move_selection_previous,
+              ['<C-c>'] = actions.close,
+              ['<C-l>'] = require('telescope.actions.layout').toggle_preview,
+            },
+            n = {
+              ['<esc>'] = actions.close,
+              ['<C-c>'] = actions.close,
+              ['s'] = actions.close,
+              ['l'] = actions.select_default,
+              ['<C-q>'] = actions.send_to_qflist + actions.open_qflist,
+              ['<C-l>'] = require('telescope.actions.layout').toggle_preview,
+            },
+          },
+        },
+        pickers = {
+          find_files = {
+            find_command = {
+              'rg',
+              '--files',
+              '--hidden',
+              '--follow',
+              '--no-ignore',
+              '-g',
+              '!{node_modules,.git,**/_build,deps,.elixir_ls,**/target,**/assets/node_modules,**/assets/vendor,**/.next,**/.vercel,**/build,**/out}',
+            },
+          },
+          live_grep = {
+            additional_args = function()
+              return {
+                '--hidden',
+                '--follow',
+                '--no-ignore',
+                '-g',
+                '!{node_modules,.git,**/_build,deps,.elixir_ls,**/target,**/assets/node_modules,**/assets/vendor,**/.next,**/.vercel,**/build,**/out}',
+              }
+            end,
+          },
+        },
+        extensions = {
+          ['ui-select'] = {
+            require('telescope.themes').get_dropdown({
+              layout_config = {
+                height = function(_, _, max_lines) return math.min(max_lines, 12) end,
+              },
+            }),
+          },
+        },
+      }
+    end
+    local telescope = require('telescope')
+    telescope.setup(opts())
+    telescope.load_extension('fzf')
+    telescope.load_extension('ui-select')
+  end,
+})
+--:}}}
+
+--: Lazy load NvimTree {{{
+p({
+  src = 'nvim-tree/nvim-tree.lua',
+  event = { 'BufReadPost', 'BufNewFile', 'BufWritePre' },
+  cmd = { 'NvimTreeToggle', 'NvimTreeFocus' },
+  keys = {
+    {
+      'n',
+      '<leader><Space>',
+      "<cmd>lua require('nvim-tree.api').tree.toggle({ focus = false })<CR>",
+      { silent = true, desc = 'Nvimtree Toggle' },
+    },
+    {
+      'n',
+      '<leader>e',
+      "<cmd>lua require('nvim-tree.api').tree.open()<CR>",
+      { silent = false, desc = 'Nvimtree Focus window' },
+    },
+    {
+      'n',
+      '<leader>na',
+      "<cmd>lua require('nvim-tree.api').tree.collapse_all()<CR>",
+      { silent = true, desc = 'NvimTree Collapse All' },
+    },
+    {
+      'n',
+      '<leader>nc',
+      function()
+        require('nvim-tree.api').tree.collapse_all({ focus = false })
+        require('nvim-tree.api').tree.find_file()
+      end,
+      { silent = true, desc = 'NvimTree Collapse' },
+    },
+  },
+  config = function()
+    local opts = {
+      on_attach = function(bufnr)
+        local api = require('nvim-tree.api')
+
+        local function opts(desc)
+          return { desc = 'nvim-tree: ' .. desc, buffer = bufnr, noremap = true, silent = true, nowait = true }
+        end
+
+        -- default mappings
+        api.config.mappings.default_on_attach(bufnr)
+
+        -- remove a default mapping
+        vim.keymap.del('n', '<C-t>', { buffer = bufnr })
+
+        vim.keymap.set('n', 'l', api.node.open.edit, opts('Edit Or Open'))
+
+        vim.keymap.set('n', 'h', function()
+          local node = api.tree.get_node_under_cursor()
+          if node.nodes ~= nil then
+            api.node.navigate.parent_close()
+          else
+            api.node.navigate.parent()
+          end
+        end, opts('Go to parent or close'))
+
+        vim.keymap.set('n', '<CR>', function()
+          api.node.open.edit()
+          api.tree.close_in_this_tab()
+        end, opts('Open and close tree'))
+      end,
+
+      filters = {
+        dotfiles = false,
+        git_ignored = false,
+      },
+
+      disable_netrw = false,
+      hijack_netrw = false,
+      hijack_cursor = true,
+      sync_root_with_cwd = true,
+
+      update_focused_file = {
+        enable = true,
+        update_root = false,
+      },
+      view = {
+        adaptive_size = false,
+        side = 'right',
+        width = 29,
+        preserve_window_proportions = true,
+        signcolumn = 'no',
+      },
+      git = { enable = true, ignore = true },
+      filesystem_watchers = { enable = true },
+      actions = { expand_all = { max_folder_discovery = 300, exclude = { '.git' } } },
+      diagnostics = {
+        enable = true,
+        show_on_dirs = true,
+        show_on_open_dirs = true,
+        icons = {
+          hint = '',
+          info = '',
+          warning = '',
+          error = '',
+        },
+      },
+      renderer = {
+        root_folder_label = false,
+        highlight_git = true,
+        highlight_opened_files = 'none',
+
+        indent_markers = {
+          enable = true,
+        },
+
+        icons = {
+          show = {
+            file = true,
+            folder = true,
+            folder_arrow = true,
+            git = true,
+            diagnostics = true,
+          },
+          glyphs = {
+            default = '󰈚',
+            symlink = '',
+            folder = {
+              default = '',
+              empty = '',
+              empty_open = '',
+              open = '',
+              symlink = '',
+              symlink_open = '',
+              arrow_open = '',
+              arrow_closed = '',
+            },
+            git = {
+              unstaged = '✗',
+              staged = '✓',
+              unmerged = '',
+              renamed = '➜',
+              untracked = '★',
+              deleted = '',
+              ignored = '◌',
+            },
+          },
+        },
+      },
+    }
+    require('nvim-tree').setup(opts)
+  end,
+})
+--}}}
 
 --: Lazy load fff.nvim {{{
 p({
@@ -321,7 +675,7 @@ p({
     end
   end,
   keys = {
-    { 'n', '-', '<cmd>Oil<cr>', { desc = 'Oil - Parent Dir' } },
+    { 'n', '-', function() require('oil').open() end, { desc = 'Oil - Parent Dir' } },
     { 'n', '<leader>oo', '<cmd>Oil --float<cr>', { desc = 'Oil Float - Parent Dir' } },
   },
   config = function()
@@ -388,22 +742,9 @@ p({
             end
           end,
         },
-        ['gf'] = {
-          function()
-            require('telescope.builtin').find_files({
-              cwd = require('oil').get_current_dir(),
-            })
-          end,
-          mode = 'n',
-          nowait = true,
-          desc = 'Find files in the current directory with Telescope',
-        },
         ['.'] = {
           'actions.open_cmdline',
-          opts = {
-            shorten_path = true,
-            -- modify = ":h",
-          },
+          opts = { shorten_path = true },
           desc = 'Open the command line with the current directory as an argument',
         },
       },
@@ -427,6 +768,7 @@ p({
   dependencies = {
     'nvim-lua/plenary.nvim',
     'nvim-treesitter/nvim-treesitter',
+    'saghen/blink.cmp',
   },
   config = function()
     local opts = {
@@ -499,5 +841,134 @@ p({
     { 'x', '<leader>pt', ':EasyAlign *|<cr>', { desc = 'Align Markdown Table' } },
     { 'v', '<leader>pa', ':EasyAlign = l5', { desc = 'EasyAlign' } },
   },
+})
+
+p({
+  src = 'lukas-reineke/virt-column.nvim',
+  event = 'BufReadPost',
+  config = function()
+    local opts = {
+      char = { '│' },
+      virtcolumn = '80',
+      exclude = { filetypes = { 'markdown', 'oil' } },
+    }
+    require('virt-column').setup(opts)
+  end,
+})
+
+p({
+  src = 'nvim-treesitter/nvim-treesitter-context',
+  event = { 'BufReadPost', 'BufNewFile', 'BufWritePre' },
+  config = function()
+    local opts = {
+      max_lines = 3,
+      multiline_threshold = 1,
+    }
+    require('treesitter-context').setup(opts)
+  end,
+  keys = {
+    {
+      'n',
+      '<leader>lc',
+      function()
+        vim.schedule(function() require('treesitter-context').go_to_context() end)
+        return '<Ignore>'
+      end,
+      { desc = 'Jump to upper context', expr = true },
+    },
+  },
+})
+
+p({ src = 'JoosepAlviste/nvim-ts-context-commentstring' })
+p({
+  src = 'numToStr/Comment.nvim',
+  event = { 'BufReadPost', 'BufNewFile' },
+  dependencies = {
+    'JoosepAlviste/nvim-ts-context-commentstring',
+  },
+  config = function()
+    local opts = {
+      pre_hook = require('ts_context_commentstring.integrations.comment_nvim').create_pre_hook(),
+    }
+    require('Comment').setup(opts)
+  end,
+})
+
+p({
+  src = 'RRethy/vim-illuminate',
+  event = { 'BufReadPre', 'BufNewFile' },
+  config = function()
+    local opts = {
+      delay = 200,
+      large_file_cutoff = 2000,
+      large_file_overrides = {
+        providers = { 'lsp' },
+      },
+    }
+    require('illuminate').configure(opts)
+
+    local function map(key, dir, buffer)
+      vim.keymap.set(
+        'n',
+        key,
+        function() require('illuminate')['goto_' .. dir .. '_reference'](false) end,
+        { desc = dir:sub(1, 1):upper() .. dir:sub(2) .. ' Reference', buffer = buffer }
+      )
+    end
+
+    map(']]', 'next')
+    map('[[', 'prev')
+
+    -- also set it after loading ftplugins, since a lot overwrite [[ and ]]
+    vim.api.nvim_create_autocmd('FileType', {
+      callback = function()
+        local buffer = vim.api.nvim_get_current_buf()
+        map(']]', 'next', buffer)
+        map('[[', 'prev', buffer)
+      end,
+    })
+  end,
+  keys = {
+    { 'n', ']]', { desc = 'Next Reference' } },
+    { 'n', '[[', { desc = 'Prev Reference' } },
+  },
+})
+
+p({
+  src = 'Wansmer/treesj',
+  keys = {
+    { 'n', '<leader>cj', '<cmd>TSJToggle<cr>', { desc = 'Join/split code block' } },
+  },
+  config = function()
+    local opts = { use_default_keymaps = false, max_join_length = 999 }
+    require('treesj').setup(opts)
+  end,
+})
+
+p({
+  src = 'abecodes/tabout.nvim',
+  event = 'InsertEnter',
+  dependencies = { 'nvim-treesitter' },
+  config = function()
+    local opts = {
+      tabkey = [[<C-\>]], -- key to trigger tabout, set to an empty string to disable
+      backwards_tabkey = [[<C-S-\>]], -- key to trigger backwards tabout, set to an empty string to disable
+      act_as_tab = false, -- shift content if tab out is not possible
+      act_as_shift_tab = false, -- reverse shift content if tab out is not possible (if your keyboard/terminal supports <S-Tab>)
+      enable_backwards = true, -- well ...
+      completion = true, -- if the tabkey is used in a completion pum
+      tabouts = {
+        { open = "'", close = "'" },
+        { open = '"', close = '"' },
+        { open = '`', close = '`' },
+        { open = '(', close = ')' },
+        { open = '[', close = ']' },
+        { open = '{', close = '}' },
+      },
+      ignore_beginning = true, --[[ if the cursor is at the beginning of a filled element it will rather tab out than shift the content ]]
+      exclude = {}, -- tabout will ignore these filetypes
+    }
+    require('tabout').setup(opts)
+  end,
 })
 --}}}
